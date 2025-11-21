@@ -31,26 +31,6 @@ function TermCheckApp() {
       if (res.settings) {
         let migratedSettings = res.settings;
 
-        // Migration: Convert old apiKey to new apiKeys structure
-        if ('apiKey' in res.settings && !('apiKeys' in res.settings)) {
-          console.log('[Migration] Converting old apiKey to new apiKeys structure');
-          migratedSettings = {
-            ...res.settings,
-            apiKeys: {
-              openai: '',
-              anthropic: '',
-              groq: '',
-              gemini: '',
-              moonshot: '',
-              openrouter: '',
-              [res.settings.provider]: res.settings.apiKey || ''
-            }
-          };
-          delete (migratedSettings as any).apiKey;
-          // Save migrated settings
-          chrome.storage.local.set({ settings: migratedSettings });
-        }
-
         setSettings(migratedSettings);
         // Load models for the saved provider
         await loadModelsForProvider(migratedSettings.provider, migratedSettings.apiKeys[migratedSettings.provider]);

@@ -1,6 +1,7 @@
 import { AIService } from '../lib/ai/service';
 import { SYSTEM_PROMPT } from '../lib/prompts';
 import { AppSettings, LegalFlag } from '../lib/types';
+import { getProviderConfig } from '../lib/ai/providers';
 
 // Enhanced security and debugging with sender information
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -56,7 +57,8 @@ async function handleAnalysis(
     const storage = await chrome.storage.local.get(['settings']);
     const settings: AppSettings = storage.settings;
 
-    if (!settings?.apiKeys?.[settings.provider]) {
+    const providerConfig = getProviderConfig(settings.provider);
+    if (providerConfig?.requiresApiKey && !settings?.apiKeys?.[settings.provider]) {
       console.error(`[TermCheck] API Key missing for provider ${settings.provider}`);
       sendResponse({ success: false, error: `API Key missing for ${settings.provider}` });
       return;

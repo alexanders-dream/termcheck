@@ -84,7 +84,25 @@ export const ResultsList = ({ flags, onRescan }: ResultsListProps) => {
                             </div>
                         </CardContent>
                     </Card>
-                ))}
+                ))
+                }
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-slate-200">
+                <div className="text-center space-y-4">
+                    <p className="text-sm text-slate-500">
+                        Find this tool useful? Support its development!
+                    </p>
+                    <div className="flex justify-center">
+                        <a href="https://www.buymeacoffee.com/oguso" target="_blank" rel="noopener noreferrer" className="transition-transform hover:scale-105">
+                            <img
+                                src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png"
+                                alt="Buy Me A Coffee"
+                                style={{ height: '50px', width: '180px' }}
+                            />
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     );

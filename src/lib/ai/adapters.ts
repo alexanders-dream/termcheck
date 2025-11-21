@@ -128,52 +128,6 @@ export async function analyzeWithGemini(text: string, apiKey: string, systemProm
     }
 }
 
-export async function analyzeWithMoonshot(text: string, apiKey: string, systemPrompt: string, model: string): Promise<LegalFlag[]> {
-    try {
-        const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Analyze this legal text: ${text.substring(0, 15000)}` }
-                ],
-                temperature: 0.1,
-                max_tokens: 4096
-            })
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Moonshot API Error: ${error}`);
-        }
-
-        const data = await response.json();
-
-        // Try to parse JSON from the response content
-        try {
-            const content = JSON.parse(data.choices[0].message.content);
-            return content.flags || [];
-        } catch {
-            // If not valid JSON, try to extract JSON-like content
-            const content = data.choices[0].message.content;
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                return parsed.flags || [];
-            }
-            return [];
-        }
-    } catch (error) {
-        console.error('Moonshot Analysis Failed', error);
-        return [];
-    }
-}
-
 export async function analyzeWithOpenRouter(text: string, apiKey: string, systemPrompt: string, model: string = 'openrouter/auto'): Promise<LegalFlag[]> {
     try {
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -206,6 +160,55 @@ export async function analyzeWithOpenRouter(text: string, apiKey: string, system
         return content.flags || [];
     } catch (error) {
         console.error('OpenRouter Analysis Failed', error);
+        return [];
+    }
+}
+
+export async function analyzeWithOllama(text: string, _apiKey: string, systemPrompt: string, model: string): Promise<LegalFlag[]> {
+    try {
+        const response = await fetch('http://localhost:11434/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: `Analyze this legal text: ${text.substring(0, 15000)}` }
+                ],
+                format: "json",
+                stream: false,
+                options: {
+                    temperature: 0.1,
+                    num_ctx: 8192
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Ollama API Error: ${error}`);
+        }
+
+        const data = await response.json();
+        const content = data.message.content;
+
+        // Parse JSON response
+        try {
+            const parsed = JSON.parse(content);
+            return parsed.flags || [];
+        } catch {
+            // Try to extract JSON if wrapped in text
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                return parsed.flags || [];
+            }
+            return [];
+        }
+    } catch (error) {
+        console.error('Ollama Analysis Failed', error);
         return [];
     }
 }

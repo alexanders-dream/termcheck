@@ -26,7 +26,7 @@ export async function analyzeWithAnthropic(text: string, apiKey: string, systemP
 
     const data = await response.json();
     const content = data.content[0].text;
-    
+
     // Try to parse JSON from the response
     try {
       const parsed = JSON.parse(content);
@@ -108,7 +108,7 @@ export async function analyzeWithGemini(text: string, apiKey: string, systemProm
 
     const data = await response.json();
     const content = data.candidates[0].content.parts[0].text;
-    
+
     // Parse JSON response
     try {
       const parsed = JSON.parse(content);
@@ -124,52 +124,6 @@ export async function analyzeWithGemini(text: string, apiKey: string, systemProm
     }
   } catch (error) {
     console.error('Gemini Analysis Failed', error);
-    return [];
-  }
-}
-
-export async function analyzeWithMoonshot(text: string, apiKey: string, systemPrompt: string): Promise<LegalFlag[]> {
-  try {
-    const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "moonshot-v1-8k",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Analyze this legal text: ${text.substring(0, 15000)}` }
-        ],
-        temperature: 0.1,
-        max_tokens: 4096
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Moonshot API Error: ${error}`);
-    }
-
-    const data = await response.json();
-    
-    // Try to parse JSON from the response content
-    try {
-      const content = JSON.parse(data.choices[0].message.content);
-      return content.flags || [];
-    } catch {
-      // If not valid JSON, try to extract JSON-like content
-      const content = data.choices[0].message.content;
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return parsed.flags || [];
-      }
-      return [];
-    }
-  } catch (error) {
-    console.error('Moonshot Analysis Failed', error);
     return [];
   }
 }

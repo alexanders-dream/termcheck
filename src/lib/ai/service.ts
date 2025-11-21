@@ -1,6 +1,6 @@
 import { LegalFlag, AIProvider, AppSettings, AIModel } from '../types';
 import { analyzeWithOpenAI } from './openai';
-import { analyzeWithAnthropic, analyzeWithGroq, analyzeWithGemini, analyzeWithMoonshot, analyzeWithOpenRouter } from './adapters.js';
+import { analyzeWithAnthropic, analyzeWithGroq, analyzeWithGemini, analyzeWithOpenRouter, analyzeWithOllama } from './adapters.js';
 import { getProviderConfig, getModelById, getModelsForProvider } from './providers';
 
 import { chunkText, mergeFlags, getChunkSize } from '../chunking';
@@ -16,7 +16,7 @@ export class AIService {
     const { provider, apiKeys, model } = this.settings;
     const apiKey = apiKeys[provider];
 
-    if (!apiKey) {
+    if (!apiKey && provider !== 'ollama') {
       throw new Error(`API key is required for ${provider}`);
     }
 
@@ -44,7 +44,7 @@ export class AIService {
     if (text.length <= chunkSize) {
       // Text fits in one chunk, analyze directly
       console.log(`[AIService] Text fits in single chunk, analyzing directly`);
-      return await this.analyzeChunkWithRetry(text, provider, apiKey, model, systemPrompt);
+      return await this.analyzeChunkWithRetry(text, provider, apiKey || '', model, systemPrompt);
     }
 
     // Text is too long, split into chunks
@@ -59,7 +59,7 @@ export class AIService {
         // Add a small delay between chunks to be nice to APIs
         if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const flags = await this.analyzeChunkWithRetry(chunks[i], provider, apiKey, model, systemPrompt);
+        const flags = await this.analyzeChunkWithRetry(chunks[i], provider, apiKey || '', model, systemPrompt);
         allFlags.push(flags);
       } catch (error) {
         console.error(`[AIService] Failed to analyze chunk ${i + 1}:`, error);
@@ -121,11 +121,11 @@ export class AIService {
         case 'gemini':
           return await analyzeWithGemini(text, apiKey, systemPrompt, model);
 
-        case 'moonshot':
-          return await analyzeWithMoonshot(text, apiKey, systemPrompt, model);
-
         case 'openrouter':
           return await analyzeWithOpenRouter(text, apiKey, systemPrompt, model);
+
+        case 'ollama':
+          return await analyzeWithOllama(text, apiKey, systemPrompt, model);
 
         default:
           throw new Error(`Unsupported provider: ${provider}`);

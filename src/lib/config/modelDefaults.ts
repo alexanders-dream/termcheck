@@ -34,15 +34,15 @@ export const PROVIDER_CONFIGS = {
     apiKeyUrl: 'https://makersuite.google.com/app/apikey',
     requiresApiKey: true
   },
-  moonshot: {
-    baseUrl: 'https://api.moonshot.cn/v1',
-    apiKeyUrl: 'https://platform.moonshot.cn/api-keys',
-    requiresApiKey: true
-  },
   openrouter: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKeyUrl: 'https://openrouter.ai/keys',
     requiresApiKey: true
+  },
+  ollama: {
+    baseUrl: 'http://localhost:11434/api',
+    apiKeyUrl: '',
+    requiresApiKey: false
   }
 };
 
@@ -96,8 +96,8 @@ export const DEFAULT_SETTINGS = {
     anthropic: '',
     groq: '',
     gemini: '',
-    moonshot: '',
-    openrouter: ''
+    openrouter: '',
+    ollama: ''
   }
 };
 

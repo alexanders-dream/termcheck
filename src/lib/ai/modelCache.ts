@@ -135,7 +135,7 @@ export class ModelCacheManager {
      */
     async clearAllCaches(): Promise<void> {
         try {
-            const providers: AIProvider[] = ['openai', 'anthropic', 'groq', 'gemini', 'moonshot', 'openrouter'];
+            const providers: AIProvider[] = ['openai', 'anthropic', 'groq', 'gemini', 'openrouter', 'ollama'];
             const keys = providers.map(p => this.getCacheKey(p));
             await chrome.storage.local.remove(keys);
             console.log('[ModelCache] All caches cleared');
@@ -162,7 +162,7 @@ export class ModelCacheManager {
      * Get cache statistics for debugging
      */
     async getCacheStats(): Promise<Record<AIProvider, { age: number; modelCount: number; source: string } | null>> {
-        const providers: AIProvider[] = ['openai', 'anthropic', 'groq', 'gemini', 'moonshot', 'openrouter'];
+        const providers: AIProvider[] = ['openai', 'anthropic', 'groq', 'gemini', 'openrouter', 'ollama'];
         const stats: Record<string, { age: number; modelCount: number; source: string } | null> = {};
 
         for (const provider of providers) {

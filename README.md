@@ -4,12 +4,15 @@ A Chrome extension that analyzes Terms of Service and Privacy Policies for red f
 
 ## Features
 
-- **Multi-Provider Support**: Choose from OpenAI, Anthropic, Groq, Gemini, Moonshot, or OpenRouter.
-- **Dynamic Model Loading**: Automatically fetches available models from your selected provider.
-- **Smart Text Chunking**: Intelligently splits long documents into semantic chunks for analysis, preserving context.
-- **Risk Categorization**: Identifies issues in categories like Data Privacy, Arbitration, Unilateral Changes, Termination, IP Rights.
-- **Severity Levels**: Flags are categorized as Low, Medium, or High risk.
-- **Privacy Focused**: API keys are stored locally in your browser.
+- **Multi-Provider Support**: Choose from OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, or Ollama (local).
+- **Dynamic Model Loading**: Automatically fetches available models from your selected provider's API with intelligent caching.
+- **Model Refresh**: Manually refresh the model list to get the latest available models from your provider.
+- **Smart Text Chunking**: Intelligently splits long documents into semantic chunks using a multi-stage fallback strategy (sentences → paragraphs → words → characters) for accurate analysis while preserving context.
+- **Comprehensive Risk Detection**: Identifies issues in categories including Data Sharing, Arbitration, Unilateral Changes, Liability, Jurisdiction, Termination, Intellectual Property, Privacy, Surveillance, and more.
+- **Severity Levels**: Flags are categorized as Low, Medium, High, or Critical risk with color-coded badges and icons.
+- **Privacy Focused**: API keys are stored locally in your browser using Chrome's storage API. Your data never leaves your device except for API calls to your chosen provider.
+- **Rescan Functionality**: Quickly re-analyze the current page without reloading.
+- **Local Model Support**: Run completely offline using Ollama with local models.
 
 ## Installation
 
@@ -33,40 +36,27 @@ A Chrome extension that analyzes Terms of Service and Privacy Policies for red f
 
 1. **Get an API Key**:
    - Obtain an API key from your preferred provider (e.g., [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), [Groq](https://console.groq.com/), [Google AI Studio](https://makersuite.google.com/app/apikey)).
+   - Skip this step if using Ollama locally.
 
 2. **Configure the Extension**:
    - Click the TermCheck extension icon.
    - Click the gear icon to open settings.
    - Select your AI Provider.
-   - Enter your API Key.
-   - (Optional) Select a specific model from the dropdown (models are fetched dynamically).
+   - Enter your API Key (not required for Ollama).
+   - (Optional) Select a specific model from the dropdown (models are fetched dynamically from your provider).
+   - (Optional) Click the refresh icon to manually update the model list.
    - Click "Save Configuration".
 
 3. **Analyze Documents**:
    - Navigate to a Terms of Service or Privacy Policy page.
    - Click the TermCheck extension icon.
    - Click "Analyze Page".
-   - View the analysis results with flagged issues.
-
-## Supported Providers
-
-- **OpenAI**: GPT-4o, GPT-4 Turbo, etc.
-- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus, etc.
-- **Groq**: LLaMA 3, Mixtral, etc.
-- **Google Gemini**: Gemini 1.5 Pro, Gemini 1.5 Flash.
-- **Moonshot**: Moonshot v1.
-- **OpenRouter**: Access to various models via OpenRouter.
-
-## Development
-
-### Project Structure
-```
+   - View the analysis results with flagged issues, sorted by severity.
+   - Click "Rescan Page" to re-analyze the current page with updated content or different settings.
 termcheck/
 ├── manifest.json          # Chrome extension manifest
 ├── vite.config.ts         # Vite build configuration
 ├── src/
-│   ├── assets/           # Static assets
-│   ├── components/       # Reusable UI components
 │   ├── lib/
 │   │   ├── ai/           # AI adapters and providers
 │   │   │   ├── adapters.ts
@@ -80,6 +70,7 @@ termcheck/
 │   │   ├── chunking.ts   # Smart text chunking utilities
 │   │   └── types.ts      # Shared TypeScript interfaces
 │   ├── popup/            # Extension popup UI
+│   │   ├── components/   # UI components
 │   │   ├── index.html
 │   │   ├── index.tsx
 │   │   └── App.tsx
@@ -87,6 +78,8 @@ termcheck/
 │   │   └── index.ts
 │   └── content/          # Content Script
 │       └── index.ts
+├── public/               # Static assets
+└── dist/                 # Build output
 ```
 
 ### Available Scripts
@@ -96,17 +89,28 @@ termcheck/
 - `npm run lint` - Run ESLint
 - `npm run preview` - Preview production build
 
+## How It Works
+
+1. **Content Extraction**: The extension extracts text content from the current page using the content script.
+2. **Smart Chunking**: Long documents are split into semantic chunks with overlap to preserve context.
+3. **AI Analysis**: Each chunk is analyzed by your selected AI model using a specialized legal analysis prompt.
+4. **Flag Merging**: Results from all chunks are merged and deduplicated.
+5. **Display**: Findings are displayed in the popup, sorted by severity with color-coded badges.
+
 ## Future Enhancements
 
 - **Export Options**: Allow users to export analysis reports (PDF, Markdown).
 - **Custom Prompts**: Let users customize AI analysis prompts.
 - **History**: Save past analyses for quick reference.
 - **Better Content Extraction**: Improve main content detection for complex pages.
+- **Comparison Mode**: Compare multiple versions of ToS to detect changes.
+
+## Support
+
+If you find this tool useful, consider supporting its development:
+
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-blue.png)](https://www.buymeacoffee.com/oguso)
 
 ## License
 
-This project is open source and available under the MIT License.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+All rights reserved.

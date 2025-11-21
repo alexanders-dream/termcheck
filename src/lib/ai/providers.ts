@@ -48,20 +48,20 @@ export const MINIMAL_FALLBACKS: Record<AIProvider, AIModel> = {
     supported: true,
     pricing: { input: 0.075, output: 0.30 }
   },
-  moonshot: {
-    id: 'moonshot-v1-128k',
-    name: 'Moonshot v1 128K',
-    provider: 'moonshot',
-    contextWindow: 128000,
-    maxOutputTokens: 4096,
-    supported: true
-  },
   openrouter: {
     id: 'openrouter/auto',
-    name: 'Auto (Best)',
+    name: 'Auto (Best for Prompt)',
     provider: 'openrouter',
     contextWindow: 128000,
     maxOutputTokens: 8192,
+    supported: true
+  },
+  ollama: {
+    id: 'llama3',
+    name: 'Llama 3',
+    provider: 'ollama',
+    contextWindow: 8192,
+    maxOutputTokens: 4096,
     supported: true
   }
 };
@@ -99,14 +99,6 @@ export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
     requiresApiKey: true,
     apiKeyUrl: CONFIG_PROVIDER_CONFIGS.gemini.apiKeyUrl
   },
-  moonshot: {
-    name: 'moonshot',
-    displayName: 'Moonshot AI',
-    baseUrl: CONFIG_PROVIDER_CONFIGS.moonshot.baseUrl,
-    models: [],
-    requiresApiKey: true,
-    apiKeyUrl: CONFIG_PROVIDER_CONFIGS.moonshot.apiKeyUrl
-  },
   openrouter: {
     name: 'openrouter',
     displayName: 'OpenRouter',
@@ -114,6 +106,14 @@ export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
     models: [],
     requiresApiKey: true,
     apiKeyUrl: CONFIG_PROVIDER_CONFIGS.openrouter.apiKeyUrl
+  },
+  ollama: {
+    name: 'ollama',
+    displayName: 'Ollama (Local)',
+    baseUrl: CONFIG_PROVIDER_CONFIGS.ollama.baseUrl,
+    models: [],
+    requiresApiKey: false,
+    apiKeyUrl: ''
   }
 };
 
@@ -133,10 +133,11 @@ export async function getModelsForProvider(provider: AIProvider, apiKey?: string
     return cache.models;
   }
 
-  // If API key provided, try fetching
-  if (apiKey) {
+  // If API key provided or not required (like ollama), try fetching
+  const config = getProviderConfig(provider);
+  if (apiKey || !config.requiresApiKey) {
     try {
-      const result = await fetchModelsForProvider(provider, apiKey);
+      const result = await fetchModelsForProvider(provider, apiKey || '');
       return result.models;
     } catch (error) {
       console.error(`[Providers] Failed to fetch models for ${provider}:`, error);
@@ -213,11 +214,11 @@ export async function fetchModelsForProvider(provider: AIProvider, apiKey: strin
       case 'gemini':
         models = await fetchGeminiModels(apiKey);
         break;
-      case 'moonshot':
-        models = await fetchMoonshotModels(apiKey);
-        break;
       case 'openrouter':
         models = await fetchOpenRouterModels(apiKey);
+        break;
+      case 'ollama':
+        models = await fetchOllamaModels();
         break;
     }
 
@@ -275,38 +276,40 @@ async function fetchOpenAIModels(apiKey: string): Promise<AIModel[]> {
     }));
 }
 
-async function fetchAnthropicModels(_apiKey: string): Promise<AIModel[]> {
-  // Anthropic doesn't have a public models endpoint
-  // Return a curated list of known models
-  return [
-    {
-      id: 'claude-3-5-sonnet-20241022',
-      name: 'Claude 3.5 Sonnet',
-      provider: 'anthropic',
+async function fetchAnthropicModels(apiKey: string): Promise<AIModel[]> {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch Anthropic models');
+
+    const data = await response.json();
+
+    // Map the API response to our AIModel format
+    return data.data.map((model: any) => ({
+      id: model.id,
+      name: model.display_name || model.id,
+      provider: 'anthropic' as AIProvider,
       contextWindow: 200000,
       maxOutputTokens: 8192,
       supported: true,
-      pricing: { input: 3.00, output: 15.00 }
-    },
-    {
-      id: 'claude-3-haiku-20240307',
-      name: 'Claude 3 Haiku',
-      provider: 'anthropic',
-      contextWindow: 200000,
-      maxOutputTokens: 4096,
-      supported: true,
-      pricing: { input: 0.25, output: 1.25 }
-    },
-    {
-      id: 'claude-3-opus-20240229',
-      name: 'Claude 3 Opus',
-      provider: 'anthropic',
-      contextWindow: 200000,
-      maxOutputTokens: 4096,
-      supported: true,
-      pricing: { input: 15.00, output: 75.00 }
-    }
-  ];
+      pricing: model.id.includes('opus')
+        ? { input: 15.00, output: 75.00 }
+        : model.id.includes('sonnet')
+          ? { input: 3.00, output: 15.00 }
+          : model.id.includes('haiku')
+            ? { input: 0.25, output: 1.25 }
+            : undefined
+    }));
+  } catch (error) {
+    console.error('[Providers] Failed to fetch Anthropic models from API:', error);
+    // Fallback to minimal fallback model
+    return [MINIMAL_FALLBACKS.anthropic];
+  }
 }
 
 async function fetchGroqModels(apiKey: string): Promise<AIModel[]> {
@@ -353,37 +356,6 @@ async function fetchGeminiModels(apiKey: string): Promise<AIModel[]> {
     });
 }
 
-async function fetchMoonshotModels(_apiKey: string): Promise<AIModel[]> {
-  // Moonshot doesn't have a public models endpoint
-  // Return known models
-  return [
-    {
-      id: 'moonshot-v1-8k',
-      name: 'Moonshot v1 8K',
-      provider: 'moonshot',
-      contextWindow: 8000,
-      maxOutputTokens: 4096,
-      supported: true
-    },
-    {
-      id: 'moonshot-v1-32k',
-      name: 'Moonshot v1 32K',
-      provider: 'moonshot',
-      contextWindow: 32000,
-      maxOutputTokens: 4096,
-      supported: true
-    },
-    {
-      id: 'moonshot-v1-128k',
-      name: 'Moonshot v1 128K',
-      provider: 'moonshot',
-      contextWindow: 128000,
-      maxOutputTokens: 4096,
-      supported: true
-    }
-  ];
-}
-
 async function fetchOpenRouterModels(apiKey: string): Promise<AIModel[]> {
   const response = await fetch('https://openrouter.ai/api/v1/models', {
     headers: { 'Authorization': `Bearer ${apiKey}` }
@@ -405,4 +377,26 @@ async function fetchOpenRouterModels(apiKey: string): Promise<AIModel[]> {
       output: parseFloat(model.pricing?.completion || '0') * 1000000
     }
   }));
+}
+
+async function fetchOllamaModels(): Promise<AIModel[]> {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags');
+
+    if (!response.ok) throw new Error('Failed to fetch Ollama models');
+
+    const data = await response.json();
+
+    return data.models.map((model: any) => ({
+      id: model.name,
+      name: model.name,
+      provider: 'ollama' as AIProvider,
+      contextWindow: 8192, // Default for most local models
+      maxOutputTokens: 4096,
+      supported: true
+    }));
+  } catch (error) {
+    console.error('Failed to fetch Ollama models:', error);
+    throw error;
+  }
 }
