@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "TermCheck - AI Legal Assistant",
+  "version": "1.0.0",
+  "description": "Analyze Terms of Service and Privacy Policies for red flags.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": "vite.svg"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end",
+      "type": "module"
+    }
+  ]
+}
