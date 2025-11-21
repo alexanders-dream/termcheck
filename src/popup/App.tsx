@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AppSettings, LegalFlag, AIProvider, AIModel } from '../lib/types';
 import { AIService } from '../lib/ai/service';
 import { getModelsForProvider, getProviderConfig, fetchModelsForProvider } from '../lib/ai/providers';
+import { StorageService } from '../lib/storage';
 import { UI_CONFIG, DEFAULT_SETTINGS } from '../lib/config';
 
 // Components
@@ -61,6 +62,23 @@ function TermCheckApp() {
       }
       setIsInitializing(false);
     });
+
+    // Cleanup expired results on startup
+    StorageService.cleanupExpiredResults();
+  }, []);
+
+  // Check for cached results when the popup opens
+  useEffect(() => {
+    const checkCache = async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.url) {
+        const cachedFlags = await StorageService.getAnalysisResult(tab.url);
+        if (cachedFlags) {
+          setFlags(cachedFlags);
+        }
+      }
+    };
+    checkCache();
   }, []);
 
   const loadModelsForProvider = async (provider: AIProvider, apiKey: string, forceRefresh = false) => {
@@ -71,18 +89,7 @@ function TermCheckApp() {
       setModelsSource(result.source);
 
       // If current model is not in the new list, switch to the first available one
-      // This fixes the issue where the UI shows the first item but the state is stuck on an old/invalid model
       if (result.models.length > 0) {
-        // We need to check against the *current* settings state, but inside this async function
-        // we might have a stale closure if we use 'settings.model'. 
-        // However, since this is called from effects/handlers, we should be careful.
-        // Ideally we pass the current model to check, but here we can assume that if the current
-        // settings.model is not in the list, we should update it.
-
-        // Note: We can't easily access the *latest* settings state here without a ref or passing it in.
-        // But we can check if the *current* settings.model (from closure) is valid.
-        // A safer approach is to always validate when the list changes.
-
         setSettings(prev => {
           const currentModelExists = result.models.some(m => m.id === prev.model);
           if (!currentModelExists) {
@@ -231,6 +238,10 @@ function TermCheckApp() {
 
       if (response.success) {
         setFlags(response.data);
+        // Cache the results
+        if (tab.url) {
+          await StorageService.saveAnalysisResult(tab.url, response.data);
+        }
         toast(`Analysis complete. Found ${response.data.length} items.`, 'success');
       } else {
         toast('Analysis failed: ' + response.error, 'error');
