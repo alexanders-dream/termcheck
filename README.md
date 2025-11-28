@@ -53,34 +53,6 @@ A Chrome extension that analyzes Terms of Service and Privacy Policies for red f
    - Click "Analyze Page".
    - View the analysis results with flagged issues, sorted by severity.
    - Click "Rescan Page" to re-analyze the current page with updated content or different settings.
-termcheck/
-├── manifest.json          # Chrome extension manifest
-├── vite.config.ts         # Vite build configuration
-├── src/
-│   ├── lib/
-│   │   ├── ai/           # AI adapters and providers
-│   │   │   ├── adapters.ts
-│   │   │   ├── anthropic.ts
-│   │   │   ├── modelCache.ts
-│   │   │   ├── openai.ts
-│   │   │   ├── providers.ts
-│   │   │   └── service.ts
-│   │   ├── config/       # Configuration and defaults
-│   │   ├── prompts.ts    # System prompts for AI
-│   │   ├── chunking.ts   # Smart text chunking utilities
-│   │   └── types.ts      # Shared TypeScript interfaces
-│   ├── popup/            # Extension popup UI
-│   │   ├── components/   # UI components
-│   │   ├── index.html
-│   │   ├── index.tsx
-│   │   └── App.tsx
-│   ├── background/       # Service Worker
-│   │   └── index.ts
-│   └── content/          # Content Script
-│       └── index.ts
-├── public/               # Static assets
-└── dist/                 # Build output
-```
 
 ### Available Scripts
 
