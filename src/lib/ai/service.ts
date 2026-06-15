@@ -1,5 +1,4 @@
 import { LegalFlag, AIProvider, AppSettings, AIModel } from '../types';
-import { SYSTEM_PROMPT } from '../prompts';
 import {
   analyzeWithOpenAI,
   analyzeWithAnthropic,

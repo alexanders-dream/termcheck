@@ -1,10 +1,5 @@
 import { LegalFlag } from '../types';
 
-interface ChatMessage {
-  role: 'system' | 'user';
-  content: string;
-}
-
 interface CompletionResponse {
   flags: LegalFlag[];
 }
