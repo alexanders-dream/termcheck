@@ -1,65 +1,74 @@
-import { LegalFlag } from '../../lib/types';
 import { Button } from './ui/Button';
-import { ResultsList } from './ResultsList';
-import { FileText, Search, FileWarning } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { FileText, Search, FileWarning, Shield } from 'lucide-react';
 
 interface AnalyzeViewProps {
-    loading: boolean;
-    flags: LegalFlag[];
-    onAnalyze: () => void;
-    pageUrl: string;
-    pageTitle: string;
+  loading: boolean;
+  onAnalyze: () => void;
+  pageUrl: string;
+  pageTitle: string;
 }
 
-export const AnalyzeView = ({ loading, flags, onAnalyze, pageUrl, pageTitle }: AnalyzeViewProps) => {
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center flex-1 py-12 text-center space-y-4">
-                <div className="relative">
-                    <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
-                    <div className="relative bg-white p-4 rounded-full shadow-sm border border-blue-100">
-                        <Search className="h-8 w-8 text-blue-600 animate-pulse" />
-                    </div>
-                </div>
-                <div>
-                    <h3 className="text-lg font-medium text-slate-900">Analyzing Document</h3>
-                    <p className="text-sm text-slate-500 mt-1 max-w-[200px]">
-                        Scanning for legal terms and potential risks...
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    if (flags.length > 0) {
-        return <ResultsList flags={flags} onRescan={onAnalyze} pageUrl={pageUrl} pageTitle={pageTitle} />;
-    }
-
+export const AnalyzeView = ({ loading, onAnalyze }: AnalyzeViewProps) => {
+  if (loading) {
     return (
-        <div className="flex flex-col items-center justify-center flex-1 py-12 text-center space-y-6" role="region" aria-label="Ready to scan">
-            <div className="bg-blue-50 p-6 rounded-full">
-                <FileText className="h-12 w-12 text-blue-600" />
-            </div>
-
-            <div className="space-y-2 max-w-[280px]">
-                <h2 className="text-xl font-semibold text-slate-900">Ready to Scan</h2>
-                <p className="text-sm text-slate-500">
-                    Navigate to a Terms of Service, Privacy Policy, or Contract page and click analyze.
-                </p>
-                <div className="flex items-center gap-2 text-amber-600 text-xs">
-                    <FileWarning className="h-4 w-4 flex-shrink-0" />
-                    <span>Supports web pages and browser-opened PDFs</span>
-                </div>
-            </div>
-
-            <Button
-                size="lg"
-                onClick={onAnalyze}
-                className="w-full max-w-[200px] shadow-lg shadow-blue-600/20"
-                aria-label="Analyze current page"
-            >
-                Analyze Page
-            </Button>
+      <div className="flex flex-col items-center justify-center flex-1 py-16 text-center space-y-6">
+        <div className="relative w-24 h-24">
+          <div className="absolute inset-0 bg-brand/20 rounded-full animate-ping" style={{ animationDuration: '3s' }} />
+          <div className="absolute inset-0 bg-brand/10 rounded-full animate-ping" style={{ animationDuration: '3s', animationDelay: '0.5s' }} />
+          <div className="relative w-full h-full bg-paper-surface border border-edge rounded-full flex items-center justify-center shadow-card">
+            <Shield className="h-10 w-10 text-brand animate-pulse" />
+          </div>
         </div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-ink-primary">Analyzing Document</h3>
+          <p className="text-sm text-ink-muted max-w-[220px] mx-auto">
+            Scanning for legal terms and potential risks...
+          </p>
+        </div>
+      </div>
     );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col items-center justify-center flex-1 py-16 text-center space-y-8 px-6"
+      role="region" 
+      aria-label="Ready to scan"
+    >
+      <motion.div 
+        className="relative w-24 h-24"
+        animate={{ y: [0, -8, 0] }}
+        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+      >
+        <div className="absolute inset-0 bg-brand/10 rounded-full blur-2xl" />
+        <div className="relative w-full h-full bg-paper-elevated border border-edge rounded-full flex items-center justify-center shadow-card">
+          <FileText className="h-10 w-10 text-brand" />
+        </div>
+      </motion.div>
+
+      <div className="space-y-3 max-w-[280px]">
+        <h2 className="text-xl font-bold text-ink-primary tracking-tight">Ready to Scan</h2>
+        <p className="text-sm text-ink-secondary leading-relaxed">
+          Navigate to a Terms of Service, Privacy Policy, or Contract page and click analyze.
+        </p>
+        <div className="flex items-center justify-center gap-2 text-severity-medium text-xs font-medium bg-severity-medium/5 px-3 py-1.5 rounded-full w-fit mx-auto">
+          <FileWarning className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Supports web pages and browser-opened PDFs</span>
+        </div>
+      </div>
+
+      <Button
+        size="lg"
+        onClick={onAnalyze}
+        className="w-full max-w-[240px] shadow-glow hover:shadow-glow-lg transition-shadow"
+        leftIcon={<Search className="h-4 w-4" />}
+      >
+        Analyze Page
+      </Button>
+    </motion.div>
+  );
 };

@@ -1,8 +1,10 @@
 import { LegalFlag } from '../../lib/types';
-import { Card, CardContent } from './ui/Card';
-import { Badge } from './ui/Badge';
-import { AlertTriangle, Info, AlertCircle, Download, RefreshCw } from 'lucide-react';
-import { downloadMarkdownReport, downloadJSONReport } from '../../lib/reports';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { motion } from 'framer-motion';
+import { AlertTriangle, Info, AlertCircle, RefreshCw, ShieldCheck, ShieldAlert, ShieldOff, FileText, FileOutput } from 'lucide-react';
+import { downloadWordReport, downloadPDFReport } from '../../lib/reports';
+import { cn } from '../../lib/utils';
 
 interface ResultsListProps {
     flags: LegalFlag[];
@@ -14,22 +16,31 @@ interface ResultsListProps {
 export const ResultsList = ({ flags, onRescan, pageUrl, pageTitle }: ResultsListProps) => {
     const getSeverityIcon = (severity: string) => {
         switch (severity.toLowerCase()) {
-            case 'critical': return <AlertCircle className="h-5 w-5 text-red-700" aria-label="Critical severity" />;
-            case 'high': return <AlertTriangle className="h-5 w-5 text-orange-500" aria-label="High severity" />;
-            case 'medium': return <AlertTriangle className="h-5 w-5 text-yellow-500" aria-label="Medium severity" />;
-            case 'low': return <Info className="h-5 w-5 text-blue-500" aria-label="Low severity" />;
-            default: return <Info className="h-5 w-5 text-slate-500" aria-label="Unknown severity" />;
+            case 'critical': return <AlertCircle className="h-5 w-5 text-severity-critical" />;
+            case 'high': return <AlertTriangle className="h-5 w-5 text-severity-high" />;
+            case 'medium': return <AlertTriangle className="h-5 w-5 text-severity-medium" />;
+            case 'low': return <Info className="h-5 w-5 text-severity-low" />;
+            default: return <Info className="h-5 w-5 text-ink-muted" />;
         }
     };
 
-    const getSeverityBadgeVariant = (severity: string) => {
-        switch (severity.toLowerCase()) {
-            case 'critical': return 'destructive';
-            case 'high': return 'destructive';
-            case 'medium': return 'warning';
-            case 'low': return 'info';
-            default: return 'secondary';
-        }
+    const SeverityBadge = ({ severity }: { severity: string }) => {
+      const styles = {
+        critical: 'bg-severity-critical/10 text-severity-critical border-severity-critical/30 shadow-[0_0_12px_rgba(239,68,68,0.15)]',
+        high: 'bg-severity-high/10 text-severity-high border-severity-high/30',
+        medium: 'bg-severity-medium/10 text-severity-medium border-severity-medium/30',
+        low: 'bg-severity-low/10 text-severity-low border-severity-low/30',
+      };
+      const severityKey = severity.toLowerCase() as keyof typeof styles;
+      
+      return (
+        <span className={cn(
+          'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest',
+          styles[severityKey] || styles.low
+        )}>
+          {severity}
+        </span>
+      );
     };
 
     const getSeverityWeight = (severity: string) => {
@@ -48,104 +59,133 @@ export const ResultsList = ({ flags, onRescan, pageUrl, pageTitle }: ResultsList
 
     const criticalCount = flags.filter(f => f.severity === 'Critical').length;
     const highCount = flags.filter(f => f.severity === 'High').length;
-    const overallRisk = criticalCount > 0 ? 'Critical' : highCount > 0 ? 'High' : flags.some(f => f.severity === 'Medium') ? 'Medium' : 'Low';
+    const mediumCount = flags.filter(f => f.severity === 'Medium').length;
+    const lowCount = flags.filter(f => f.severity === 'Low').length;
+    
+    const overallRisk = criticalCount > 0 ? 'Critical' : highCount > 0 ? 'High' : mediumCount > 0 ? 'Medium' : 'Low';
+    
+    const containerVariants = {
+      hidden: { opacity: 0 },
+      show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.08 }
+      }
+    };
+    
+    const itemVariants = {
+      hidden: { opacity: 0, y: 20 },
+      show: { opacity: 1, y: 0 }
+    };
 
     return (
-        <div className="space-y-4 pb-4" role="region" aria-label="Analysis results">
+        <motion.div 
+          initial="hidden"
+          animate="show"
+          variants={containerVariants}
+          className="space-y-5 pb-6" 
+          role="region" 
+          aria-label="Analysis results"
+        >
             <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg font-semibold text-slate-900" id="findings-heading">Findings ({flags.length})</h2>
-                <button
-                    onClick={onRescan}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
-                    aria-label="Rescan current page"
-                >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Rescan Page
-                </button>
+                <h2 className="text-lg font-bold text-ink-primary tracking-tight" id="findings-heading">Findings ({flags.length})</h2>
+                <Button variant="ghost" size="sm" onClick={onRescan} leftIcon={<RefreshCw className="h-3.5 w-3.5" />}>
+                    Rescan
+                </Button>
             </div>
 
-            {/* Overall Risk Summary */}
-            <div className={`p-3 rounded-lg border ${overallRisk === 'Critical' ? 'bg-red-50 border-red-200 text-red-800' : overallRisk === 'High' ? 'bg-orange-50 border-orange-200 text-orange-800' : overallRisk === 'Medium' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">Overall Risk:</span>
-                    <span className="text-sm font-bold uppercase">{overallRisk}</span>
+            <motion.div 
+              variants={itemVariants}
+              className="p-5 rounded-2xl border border-edge bg-paper-surface shadow-sm relative overflow-hidden"
+            >
+                <div className={cn(
+                  "absolute inset-0 opacity-[0.03] dark:opacity-[0.05]",
+                  overallRisk === 'Critical' ? 'bg-severity-critical' : 
+                  overallRisk === 'High' ? 'bg-severity-high' : 
+                  overallRisk === 'Medium' ? 'bg-severity-medium' : 
+                  'bg-severity-low'
+                )} />
+                <div className="relative z-10 flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        {overallRisk === 'Critical' && <ShieldOff className="h-6 w-6 text-severity-critical" />}
+                        {overallRisk === 'High' && <ShieldAlert className="h-6 w-6 text-severity-high" />}
+                        {overallRisk === 'Medium' && <ShieldAlert className="h-6 w-6 text-severity-medium" />}
+                        {overallRisk === 'Low' && <ShieldCheck className="h-6 w-6 text-severity-low" />}
+                        <div>
+                          <p className="text-sm font-medium text-ink-secondary">Overall Risk</p>
+                          <p className={cn("text-xl font-bold uppercase tracking-tight",
+                            overallRisk === 'Critical' ? 'text-severity-critical' : 
+                            overallRisk === 'High' ? 'text-severity-high' : 
+                            overallRisk === 'Medium' ? 'text-severity-medium' : 
+                            'text-severity-low'
+                          )}>
+                            {overallRisk}
+                          </p>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex gap-4 mt-2 text-xs">
-                    <span>Critical: {criticalCount}</span>
-                    <span>High: {highCount}</span>
-                    <span>Medium: {flags.filter(f => f.severity === 'Medium').length}</span>
-                    <span>Low: {flags.filter(f => f.severity === 'Low').length}</span>
+                
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {[
+                    { label: 'Critical', count: criticalCount, color: 'bg-severity-critical' },
+                    { label: 'High', count: highCount, color: 'bg-severity-high' },
+                    { label: 'Medium', count: mediumCount, color: 'bg-severity-medium' },
+                    { label: 'Low', count: lowCount, color: 'bg-severity-low' },
+                  ].map(item => (
+                    <div key={item.label} className="bg-paper-elevated rounded-lg p-2 border border-edge">
+                      <div className={cn("h-1 w-full rounded-full mb-2", item.color, item.count === 0 ? 'opacity-20' : 'opacity-100')} />
+                      <p className="text-[10px] text-ink-muted uppercase tracking-wider font-medium">{item.label}</p>
+                      <p className="text-sm font-bold text-ink-primary mt-0.5">{item.count}</p>
+                    </div>
+                  ))}
                 </div>
-            </div>
+            </motion.div>
 
-            {/* Download Buttons */}
             <div className="flex gap-2">
-                <button
-                    onClick={() => downloadMarkdownReport(flags, pageUrl, pageTitle)}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                    aria-label="Download Markdown report"
-                >
-                    <Download className="h-3.5 w-3.5" />
-                    Export Markdown
-                </button>
-                <button
-                    onClick={() => downloadJSONReport(flags, pageUrl, pageTitle)}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                    aria-label="Download JSON report"
-                >
-                    <Download className="h-3.5 w-3.5" />
-                    Export JSON
-                </button>
+                <Button variant="outline" size="sm" onClick={() => downloadWordReport(flags, pageUrl, pageTitle)} className="flex-1" leftIcon={<FileText className="h-3.5 w-3.5" />}>
+                    Export Word
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => downloadPDFReport(flags, pageUrl, pageTitle)} className="flex-1" leftIcon={<FileOutput className="h-3.5 w-3.5" />}>
+                    Export PDF
+                </Button>
             </div>
 
-            <div className="space-y-3" role="list" aria-labelledby="findings-heading">
+            <motion.div className="space-y-3" role="list" aria-labelledby="findings-heading">
                 {sortedFlags.map((flag, idx) => (
-                    <Card key={idx} className="overflow-hidden transition-all hover:shadow-md" role="listitem">
-                        <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                                <div className="mt-0.5 flex-shrink-0">
+                    <motion.div key={idx} variants={itemVariants}>
+                      <Card isHoverable className="overflow-hidden">
+                        <div className="p-5">
+                            <div className="flex items-start gap-3.5">
+                                <div className="mt-1 flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-paper-elevated border border-edge">
                                     {getSeverityIcon(flag.severity)}
                                 </div>
-                                <div className="flex-1 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <div className="flex-1 min-w-0 space-y-3">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
                                             {flag.category}
                                         </span>
-                                        <Badge variant={getSeverityBadgeVariant(flag.severity)} className="capitalize">
-                                            {flag.severity}
-                                        </Badge>
+                                        <SeverityBadge severity={flag.severity} />
                                     </div>
 
-                                    <p className="text-sm font-medium text-slate-900 leading-snug">
+                                    <p className="text-sm font-medium text-ink-primary leading-snug break-words">
                                         {flag.summary}
                                     </p>
 
-                                    <div className="relative rounded bg-slate-50 p-3 text-xs text-slate-600 italic border-l-2 border-slate-300">
+                                    <div className="relative rounded-lg bg-paper-elevated border border-edge p-3.5 text-xs text-ink-secondary leading-relaxed break-words font-mono">
                                         "{flag.quote}"
                                     </div>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                      </Card>
+                    </motion.div>
                 ))}
-            </div>
+            </motion.div>
 
-            <div className="mt-8 pt-6 border-t border-slate-200">
-                <div className="text-center space-y-4">
-                    <p className="text-sm text-slate-500">
-                        Find this tool useful? Support its development!
-                    </p>
-                    <div className="flex justify-center">
-                        <a href="https://www.buymeacoffee.com/oguso" target="_blank" rel="noopener noreferrer" className="transition-transform hover:scale-105" aria-label="Support the developer on Buy Me A Coffee">
-                            <img
-                                src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png"
-                                alt="Buy Me A Coffee"
-                                style={{ height: '50px', width: '180px' }}
-                            />
-                        </a>
-                    </div>
-                </div>
+            <div className="pt-6 border-t border-edge/50 text-center">
+                <p className="text-xs text-ink-muted">
+                    Find this tool useful? <a href="https://www.buymeacoffee.com/oguso" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-brand-400 transition-colors underline decoration-brand/30 underline-offset-2">Support its development</a>
+                </p>
             </div>
-        </div>
+        </motion.div>
     );
 };

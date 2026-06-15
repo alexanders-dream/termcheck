@@ -1,28 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --paper-bg: #ffffff;
+    --paper-surface: #f8fafc;
+    --paper-elevated: #ffffff;
+    --paper-hover: #f1f5f9;
+    --ink-primary: #0f172a;
+    --ink-secondary: #475569;
+    --ink-muted: #94a3b8;
+    --edge: #e2e8f0;
+    --edge-light: #cbd5e1;
+
+    body {
+      @apply font-sans text-ink-primary antialiased;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+  }
+
+  .dark {
+    --paper-bg: #0B0D12;
+    --paper-surface: #12161C;
+    --paper-elevated: #1A1F2A;
+    --paper-hover: #212833;
+    --ink-primary: #F0F2F5;
+    --ink-secondary: #8B94A5;
+    --ink-muted: #5A6578;
+    --edge: #2D3443;
+    --edge-light: #3D4455;
+  }
+
   body {
-    @apply font-sans text-slate-900 antialiased;
+    @apply bg-paper-bg;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/50 ring-offset-0;
   }
 }
 
-/* Custom scrollbar for the results list */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-edge rounded-full;
+  }
 
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400;
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-edge-light;
+  }
 }

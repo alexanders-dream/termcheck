@@ -1,105 +1,166 @@
-import { LegalFlag, Severity } from './types';
+import { LegalFlag } from './types';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
-function getSeverityWeight(severity: Severity): number {
-  switch (severity) {
-    case 'Critical': return 4;
-    case 'High': return 3;
-    case 'Medium': return 2;
-    case 'Low': return 1;
+const getSeverityWeight = (severity: string) => {
+  switch (severity.toLowerCase()) {
+    case 'critical': return 4;
+    case 'high': return 3;
+    case 'medium': return 2;
+    case 'low': return 1;
     default: return 0;
   }
-}
+};
 
-function sortFlags(flags: LegalFlag[]): LegalFlag[] {
+const sortFlags = (flags: LegalFlag[]) => {
   return [...flags].sort((a, b) => getSeverityWeight(b.severity) - getSeverityWeight(a.severity));
-}
+};
 
-export function generateMarkdownReport(flags: LegalFlag[], pageUrl: string, pageTitle: string): string {
+const getSeverityColor = (severity: string) => {
+  switch (severity.toLowerCase()) {
+    case 'critical': return '#EF4444';
+    case 'high': return '#F97316';
+    case 'medium': return '#FBBF24';
+    case 'low': return '#3B82F6';
+    default: return '#64748B';
+  }
+};
+
+function generateReportHtml(flags: LegalFlag[], pageUrl: string, _pageTitle: string) {
   const sorted = sortFlags(flags);
   const now = new Date().toLocaleString();
+  
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TermCheck Analysis Report</title>
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #1a1a2e; max-width: 800px; margin: 0 auto; padding: 40px; background: #f8f9fa; }
+    .header { text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 16px; margin-bottom: 30px; }
+    .header h1 { margin: 0 0 8px; font-size: 28px; font-weight: 700; }
+    .header .url { opacity: 0.9; font-size: 13px; word-break: break-all; }
+    .header .date { opacity: 0.8; font-size: 12px; margin-top: 8px; }
+    .findings-count { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .findings-count h2 { margin: 0 0 12px; font-size: 18px; }
+    .severity-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .severity-card { padding: 12px; border-radius: 8px; text-align: center; }
+    .severity-card .count { font-size: 24px; font-weight: 700; }
+    .severity-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; }
+    .findings-list { space: 16px; }
+    .finding-card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); page-break-inside: avoid; }
+    .finding-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .category { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
+    .severity-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; }
+    .summary { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 12px; }
+    .quote { background: #f3f4f6; border-left: 3px solid #d1d5db; padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 13px; color: #4b5563; font-style: italic; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
+    @media print {
+      body { padding: 0; background: white; }
+      .finding-card { box-shadow: none; border: 1px solid #e5e7eb; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>TermCheck Analysis Report</h1>
+    <div class="url">${pageUrl}</div>
+    <div class="date">Generated: ${now}</div>
+  </div>
 
-  const lines = [
-    '# TermCheck Analysis Report',
-    '',
-    `**Page:** [${pageTitle}](${pageUrl})`,
-    `**Date:** ${now}`,
-    `**Total Flags:** ${flags.length}`,
-    '',
-    '## Severity Summary',
-    '',
-    `- Critical: ${sorted.filter(f => f.severity === 'Critical').length}`,
-    `- High: ${sorted.filter(f => f.severity === 'High').length}`,
-    `- Medium: ${sorted.filter(f => f.severity === 'Medium').length}`,
-    `- Low: ${sorted.filter(f => f.severity === 'Low').length}`,
-    '',
-    '## Findings',
-    '',
-  ];
+  <div class="findings-count">
+    <h2>Findings Summary (${flags.length})</h2>
+    <div class="severity-grid">
+      ${['Critical', 'High', 'Medium', 'Low'].map(sev => {
+        const count = flags.filter(f => f.severity === sev).length;
+        const color = getSeverityColor(sev);
+        return `<div class="severity-card" style="background: ${color}10;">
+          <div class="count" style="color: ${color};">${count}</div>
+          <div class="label" style="color: ${color};">${sev}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
 
-  if (sorted.length === 0) {
-    lines.push('No significant red flags identified.', '');
-  } else {
-    sorted.forEach((flag, idx) => {
-      lines.push(`### ${idx + 1}. ${flag.category} (${flag.severity})`, '');
-      lines.push(`**Summary:** ${flag.summary}`, '');
-      lines.push(`**Quote:**`, '');
-      lines.push(`> ${flag.quote}`, '');
-      lines.push('');
-    });
-  }
+  <div class="findings-list">
+    <h2 style="margin-bottom: 16px; font-size: 20px;">Detailed Findings</h2>
+    ${sorted.map((flag) => {
+      const bgColor = getSeverityColor(flag.severity);
+      return `<div class="finding-card">
+        <div class="finding-header">
+          <span class="category">${flag.category}</span>
+          <span class="severity-badge" style="background: ${bgColor};">${flag.severity}</span>
+        </div>
+        <div class="summary">${flag.summary}</div>
+        <div class="quote">"${flag.quote}"</div>
+      </div>`;
+    }).join('')}
+  </div>
 
-  lines.push(
-    '---',
-    '',
-    '*Generated by TermCheck - AI Legal Assistant*',
-    '*This report is for informational purposes only and does not constitute legal advice.*'
-  );
-
-  return lines.join('\n');
+  <div class="footer">
+    Generated by TermCheck - AI Legal Assistant
+  </div>
+</body>
+</html>`;
 }
 
-export function generateJSONReport(flags: LegalFlag[], pageUrl: string, pageTitle: string): string {
-  const report = {
-    generatedAt: new Date().toISOString(),
-    pageUrl,
-    pageTitle,
-    summary: {
-      total: flags.length,
-      critical: flags.filter((f) => f.severity === 'Critical').length,
-      high: flags.filter((f) => f.severity === 'High').length,
-      medium: flags.filter((f) => f.severity === 'Medium').length,
-      low: flags.filter((f) => f.severity === 'Low').length,
-    },
-    flags: sortFlags(flags).map((f) => ({
-      category: f.category,
-      severity: f.severity,
-      summary: f.summary,
-      quote: f.quote,
-    })),
-  };
-  return JSON.stringify(report, null, 2);
-}
-
-export function downloadReport(content: string, filename: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
+export function downloadWordReport(flags: LegalFlag[], pageUrl: string, pageTitle: string) {
+  const html = generateReportHtml(flags, pageUrl, pageTitle);
+  const mimeType = 'application/msword';
+  const blob = new Blob(['\ufeff', html], { type: mimeType });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `TermCheck_Report_${pageTitle.replace(/[^a-zA-Z0-9]/g, '_')}.doc`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-export function downloadMarkdownReport(flags: LegalFlag[], pageUrl: string, pageTitle: string): void {
-  const content = generateMarkdownReport(flags, pageUrl, pageTitle);
-  const safeTitle = pageTitle.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
-  downloadReport(content, `termcheck-report-${safeTitle}.md`, 'text/markdown');
+export async function downloadPDFReport(flags: LegalFlag[], pageUrl: string, pageTitle: string) {
+  const html = generateReportHtml(flags, pageUrl, pageTitle);
+  const element = document.createElement('div');
+  element.innerHTML = html;
+  element.style.position = 'absolute';
+  element.style.left = '-9999px';
+  element.style.width = '800px';
+  document.body.appendChild(element);
+
+  try {
+    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+    heightLeft -= pdfHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+
+    pdf.save(`TermCheck_Report_${pageTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    alert('Failed to generate PDF. Please try again.');
+  } finally {
+    if (document.body.contains(element)) {
+      document.body.removeChild(element);
+    }
+  }
 }
 
-export function downloadJSONReport(flags: LegalFlag[], pageUrl: string, pageTitle: string): void {
-  const content = generateJSONReport(flags, pageUrl, pageTitle);
-  const safeTitle = pageTitle.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
-  downloadReport(content, `termcheck-report-${safeTitle}.json`, 'application/json');
-}
+// Keep old exports for backwards compatibility if needed, but they now export Word/PDF
+export { downloadWordReport as downloadMarkdownReport, downloadPDFReport as downloadJSONReport };

@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AppSettings, LegalFlag, AIProvider, AIModel } from '../lib/types';
 import { AIService } from '../lib/ai/service';
 import { getModelsForProvider, getProviderConfig, fetchModelsForProvider } from '../lib/ai/providers';
 import { StorageService } from '../lib/storage';
 import { SecureStorage } from '../lib/secureStorage';
 import { UI_CONFIG, DEFAULT_SETTINGS } from '../lib/config';
+import { extractPdfText } from '../lib/pdfExtractor';
 
 import { Layout } from './components/Layout';
 import { Header } from './components/Header';
 import { AnalyzeView } from './components/AnalyzeView';
+import { ResultsList } from './components/ResultsList';
 import { SettingsView } from './components/SettingsView';
 import { ToastProvider, useToast } from './components/ui/Toast';
+import { ThemeProvider } from '../lib/theme';
 
 function TermCheckApp() {
   const [view, setView] = useState<'analyze' | 'settings'>('analyze');
@@ -24,19 +28,18 @@ function TermCheckApp() {
   const [modelsSource, setModelsSource] = useState<'api' | 'cache' | 'minimal-fallback'>('minimal-fallback');
   const [currentPageTitle, setCurrentPageTitle] = useState('');
   const [currentPageUrl, setCurrentPageUrl] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
 
   const { toast } = useToast();
 
   // Initialize: load settings and migrate legacy keys
   useEffect(() => {
     (async () => {
-      // Try secure migration first
       await SecureStorage.migrateLegacySettings();
 
       chrome.storage.local.get(['settings'], async (res) => {
         if (res.settings) {
           const migratedSettings = { ...DEFAULT_SETTINGS, ...res.settings };
-          // Restore API keys from secure storage
           try {
             const secureKeys = await SecureStorage.getApiKeys();
             migratedSettings.apiKeys = { ...migratedSettings.apiKeys, ...secureKeys };
@@ -53,7 +56,6 @@ function TermCheckApp() {
         setIsInitializing(false);
       });
 
-      // Cleanup old results
       try { await StorageService.cleanupExpiredResults(); } catch { /* ignore */ }
     })();
   }, []);
@@ -108,12 +110,14 @@ function TermCheckApp() {
     const defaultModel = await AIService.getDefaultModel(provider, apiKey);
     setSettings(prev => ({ ...prev, provider, model: defaultModel }));
     setValidationError('');
+    setIsDirty(true);
     await loadModelsForProvider(provider, apiKey);
   };
 
   const handleModelChange = (model: string) => {
     setSettings(prev => ({ ...prev, model }));
     setValidationError('');
+    setIsDirty(true);
   };
 
   const handleApiKeyChange = async (apiKey: string) => {
@@ -122,6 +126,7 @@ function TermCheckApp() {
       apiKeys: { ...prev.apiKeys, [prev.provider]: apiKey }
     }));
     setValidationError('');
+    setIsDirty(true);
     if (apiKey) {
       await loadModelsForProvider(settings.provider, apiKey);
     } else {
@@ -129,6 +134,14 @@ function TermCheckApp() {
       setAvailableModels(models);
       setModelsSource('minimal-fallback');
     }
+  };
+
+  const handleNavigateBack = () => {
+    if (isDirty) {
+      const leave = window.confirm('You have unsaved changes. Are you sure you want to leave?');
+      if (!leave) return;
+    }
+    setView('analyze');
   };
 
   const saveSettings = async () => {
@@ -139,16 +152,15 @@ function TermCheckApp() {
       return;
     }
 
-    // Persist API keys securely
     try {
       await SecureStorage.saveApiKeys(settings.apiKeys);
     } catch (e) {
       console.warn('[App] Failed to secure API keys', e);
     }
 
-    // Save settings (apiKeys are kept for backwards compat but secured separately)
     chrome.storage.local.set({ settings }, () => {
       setValidationError('');
+      setIsDirty(false);
       setView('analyze');
       toast('Settings saved successfully', 'success');
     });
@@ -165,48 +177,68 @@ function TermCheckApp() {
       setCurrentPageUrl(tab.url || '');
       setCurrentPageTitle(tab.title || '');
 
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['content.js']
-        });
-      } catch (error) {
-        console.log('Content script already injected or failed to inject:', error);
-      }
+      let content = '';
+      const isPdfUrl = tab.url && (/\.pdf($|[?#])/i).test(tab.url);
 
-      await new Promise(resolve => setTimeout(resolve, UI_CONFIG.CONTENT_SCRIPT_READY_DELAY));
-
-      let contentRes: { success: boolean; content?: string; isLegal?: boolean; error?: string } | undefined;
-      let retries = UI_CONFIG.RETRY_COUNT;
-
-      while (retries > 0) {
+      if (isPdfUrl) {
         try {
-          contentRes = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTENT' });
-          if (contentRes && contentRes.success) break;
-
-          if (contentRes && !contentRes.success) {
-            console.error('Content script error:', contentRes.error);
-            if (retries === 1) { throw new Error(contentRes.error || 'Failed to extract page content'); }
+          const res = await fetch(tab.url!, { credentials: 'same-origin' });
+          if (!res.ok) {
+            throw new Error(`Failed to fetch PDF (${res.status})`);
           }
+          const buffer = await res.arrayBuffer();
+          content = await extractPdfText(buffer);
+        } catch (pdfError: any) {
+          toast(`Failed to load PDF: ${pdfError.message || 'Unknown error'}`, 'error');
+          setLoading(false);
+          return;
+        }
+      } else {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+        } catch (error) {
+          console.log('Content script already injected or failed to inject:', error);
+        }
 
-          if (!contentRes || !contentRes.content) {
-            if (retries === 1) {
-              throw new Error("Could not get page content. The page may not be fully loaded or the extension may not have proper permissions.");
+        await new Promise(resolve => setTimeout(resolve, UI_CONFIG.CONTENT_SCRIPT_READY_DELAY));
+
+        let contentRes: { success: boolean; content?: string; isLegal?: boolean; error?: string } | undefined;
+        let retries = UI_CONFIG.RETRY_COUNT;
+
+        while (retries > 0) {
+          try {
+            contentRes = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTENT' });
+            if (contentRes && contentRes.success) break;
+
+            if (contentRes && !contentRes.success) {
+              console.error('Content script error:', contentRes.error);
+              if (retries === 1) { throw new Error(contentRes.error || 'Failed to extract page content'); }
+            }
+
+            if (!contentRes || !contentRes.content) {
+              if (retries === 1) {
+                throw new Error("Could not get page content. The page may not be fully loaded or the extension may not have proper permissions.");
+              }
+            }
+          } catch (error) {
+            console.log(`Retry ${UI_CONFIG.RETRY_COUNT - retries + 1} failed:`, error);
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, UI_CONFIG.RETRY_DELAY));
+            } else {
+              throw error;
             }
           }
-        } catch (error) {
-          console.log(`Retry ${UI_CONFIG.RETRY_COUNT - retries + 1} failed:`, error);
-          retries--;
-          if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, UI_CONFIG.RETRY_DELAY));
-          } else {
-            throw error;
-          }
         }
-      }
 
-      if (!contentRes || !contentRes.content) {
-        throw new Error("Could not get page content. The page may not be fully loaded or the extension may not have proper permissions.");
+        if (!contentRes || !contentRes.content) {
+          throw new Error("Could not get page content. The page may not be fully loaded or the extension may not have proper permissions.");
+        }
+
+        content = contentRes.content;
       }
 
       const validation = AIService.validateSettings(settings, availableModels);
@@ -219,7 +251,7 @@ function TermCheckApp() {
 
       const response = await chrome.runtime.sendMessage({
         type: 'ANALYZE_DOCUMENT',
-        payload: contentRes.content
+        payload: content
       });
 
       if (response.success) {
@@ -246,12 +278,14 @@ function TermCheckApp() {
 
   if (isInitializing) {
     return (
-      <div className={`w-[${UI_CONFIG.EXTENSION_WIDTH}px] min-h-[${UI_CONFIG.EXTENSION_MIN_HEIGHT}px] bg-slate-50 p-4 flex items-center justify-center`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" role="status" aria-label="Loading"></div>
-          <p className="text-slate-600">Loading configuration...</p>
+      <Layout>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand mx-auto mb-4" role="status" aria-label="Loading"></div>
+            <p className="text-ink-secondary">Loading configuration...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -263,30 +297,48 @@ function TermCheckApp() {
         onSettingsClick={() => setView('settings')}
       />
 
-      <main className="flex-1 p-4 overflow-y-auto scrollbar-thin">
-        {view === 'settings' ? (
-          <SettingsView
-            settings={settings}
-            availableModels={availableModels}
-            modelsLoading={modelsLoading}
-            modelsSource={modelsSource}
-            validationError={validationError}
-            onBack={() => setView('analyze')}
-            onSave={saveSettings}
-            onProviderChange={handleProviderChange}
-            onModelChange={handleModelChange}
-            onApiKeyChange={handleApiKeyChange}
-            onRefreshModels={() => loadModelsForProvider(settings.provider, settings.apiKeys[settings.provider], true)}
-          />
-        ) : (
-          <AnalyzeView
-            loading={loading}
-            flags={flags}
-            onAnalyze={analyzePage}
-            pageUrl={currentPageUrl}
-            pageTitle={currentPageTitle}
-          />
-        )}
+      <main className="flex-1 p-5 overflow-y-auto scrollbar-thin">
+        <AnimatePresence mode="wait">
+          {view === 'settings' ? (
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <SettingsView
+                settings={settings}
+                availableModels={availableModels}
+                modelsLoading={modelsLoading}
+                modelsSource={modelsSource}
+                validationError={validationError}
+                onBack={handleNavigateBack}
+                onSave={saveSettings}
+                onProviderChange={handleProviderChange}
+                onModelChange={handleModelChange}
+                onApiKeyChange={handleApiKeyChange}
+                onRefreshModels={() => loadModelsForProvider(settings.provider, settings.apiKeys[settings.provider], true)}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="analyze"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {loading ? (
+                <AnalyzeView loading={true} onAnalyze={analyzePage} pageUrl={currentPageUrl} pageTitle={currentPageTitle} />
+              ) : flags.length > 0 ? (
+                <ResultsList flags={flags} onRescan={analyzePage} pageUrl={currentPageUrl} pageTitle={currentPageTitle} />
+              ) : (
+                <AnalyzeView loading={false} onAnalyze={analyzePage} pageUrl={currentPageUrl} pageTitle={currentPageTitle} />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </Layout>
   );
@@ -294,8 +346,10 @@ function TermCheckApp() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <TermCheckApp />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <TermCheckApp />
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
