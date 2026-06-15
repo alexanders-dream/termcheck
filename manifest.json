@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TermCheck - AI Legal Assistant",
-  "version": "1.0.0",
-  "description": "Analyze Terms of Service and Privacy Policies for red flags.",
+  "version": "1.1.0",
+  "description": "Analyze Terms of Service, Privacy Policies, and Contracts for red flags.",
   "icons": {
     "16": "termcheck_icon16.png",
     "32": "termcheck_icon32.png",
@@ -13,7 +13,8 @@
     "activeTab",
     "storage",
     "scripting",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://localhost/*",
@@ -26,7 +27,8 @@
       "32": "termcheck_icon32.png",
       "48": "termcheck_icon48.png",
       "128": "termcheck_icon128.png"
-    }
+    },
+    "default_title": "TermCheck - Analyze Legal Documents"
   },
   "background": {
     "service_worker": "background.js",
@@ -52,5 +54,14 @@
         "path": "rules.json"
       }
     ]
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Open TermCheck"
+    }
   }
 }

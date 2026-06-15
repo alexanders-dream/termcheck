@@ -1,4 +1,4 @@
-export type Severity = 'Low' | 'Medium' | 'High';
+export type Severity = 'Low' | 'Medium' | 'High' | 'Critical';
 
 export interface LegalFlag {
   category: string;
@@ -40,4 +40,25 @@ export interface ProviderConfig {
   models: AIModel[];
   requiresApiKey: boolean;
   apiKeyUrl: string;
+}
+
+export interface PageContent {
+  success: boolean;
+  isLegal: boolean;
+  content: string;
+  pageInfo: PageMetadata;
+}
+
+export interface PageMetadata {
+  url: string;
+  title: string;
+  isLegal: boolean;
+  domain: string;
+  protocol: string;
+  pathname: string;
+  contentLength: number;
+  wordCount: number;
+  lastModified: string;
+  extractionTimestamp: number;
+  documentReady: string;
 }

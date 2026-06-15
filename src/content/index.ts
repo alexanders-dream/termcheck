@@ -8,15 +8,14 @@
   (window as any).hasRunTermCheckContentScript = true;
 
   const CONTENT_CONFIG = {
-    LEGAL_KEYWORDS: ['terms of service', 'privacy policy', 'user agreement', 'terms and conditions'] as const,
-    MAX_CONTENT_LENGTH: 50000, // 50k characters
-    URL_CHECK_INTERVAL: 1000, // 1 second
-    TEXT_SEARCH_LIMIT: 1000, // characters to search for legal keywords
-    CONTENT_SELECTORS: ['article', 'main', '[role="main"]', '.content', '#content', '.main-content'] as const
+    LEGAL_KEYWORDS: ['terms of service', 'privacy policy', 'user agreement', 'terms and conditions', 'contract', 'agreement', 'legal'] as const,
+    MAX_CONTENT_LENGTH: 100000, // 100k characters (increased for contracts/PDFs)
+    URL_CHECK_INTERVAL: 500, // 500ms
+    TEXT_SEARCH_LIMIT: 1500,
+    CONTENT_SELECTORS: ['article', 'main', '[role="main"]', '.content', '#content', '.main-content', 'pre', 'embed[type="application/pdf"]'] as const
   };
 
   function isLegalPage(): boolean {
-    // Ensure document is ready and body exists
     if (!document.body) {
       console.warn('[TermCheck Content] Document body not ready');
       return false;
@@ -27,9 +26,61 @@
     return CONTENT_CONFIG.LEGAL_KEYWORDS.some(kw => title.includes(kw) || text.slice(0, CONTENT_CONFIG.TEXT_SEARCH_LIMIT).includes(kw));
   }
 
+  // Non-destructive DOM clone for content extraction
+  function cloneBody(): HTMLElement {
+    const clone = document.body.cloneNode(true) as HTMLElement;
+    const elementsToRemove = clone.querySelectorAll('script, style, noscript, iframe, object, embed, nav, footer, header, aside, .advertisement, .ads');
+    elementsToRemove.forEach(el => el.remove());
+    return clone;
+  }
+
+  function extractPageContent(): string {
+    try {
+      const contentSelectors = CONTENT_CONFIG.CONTENT_SELECTORS;
+      let content = '';
+
+      // For PDF pages, try to extract text from embed/object
+      const pdfEmbed = document.querySelector('embed[type="application/pdf"]') as HTMLEmbedElement;
+      if (pdfEmbed) {
+        // Note: actual PDF text extraction requires PDF.js or server-side processing
+        // We signal that this is a PDF page but can't extract text client-side securely
+        console.log('[TermCheck Content] PDF detected, extracting available text');
+      }
+
+      // Use cloned body to avoid DOM mutation
+      const clonedBody = cloneBody();
+
+      for (const selector of contentSelectors) {
+        const element = clonedBody.querySelector(selector) as HTMLElement;
+        if (element) {
+          content = element.innerText;
+          break;
+        }
+      }
+
+      if (!content) {
+        content = clonedBody.innerText;
+      }
+
+      content = content
+        .replace(/\s+/g, ' ')
+        .replace(/\n\s*\n/g, '\n\n')
+        .trim();
+
+      if (content.length > CONTENT_CONFIG.MAX_CONTENT_LENGTH) {
+        console.warn(`[TermCheck Content] Content truncated from ${content.length} to ${CONTENT_CONFIG.MAX_CONTENT_LENGTH} characters`);
+        content = content.substring(0, CONTENT_CONFIG.MAX_CONTENT_LENGTH) + '... [truncated]';
+      }
+
+      return content;
+    } catch (error) {
+      console.error('[TermCheck Content] Content extraction failed:', error);
+      return document.body?.innerText || '';
+    }
+  }
+
   // Enhanced message handler with sender validation and security checks
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    // Security: Validate sender is our extension
     const isValidSender = sender.id === chrome.runtime.id;
     const senderInfo = {
       id: sender.id,
@@ -39,14 +90,6 @@
       timestamp: new Date().toISOString()
     };
 
-    // Log for debugging and security monitoring
-    console.log(`[TermCheck Content] Message received:`, {
-      type: msg.type,
-      sender: senderInfo,
-      currentUrl: window.location.href
-    });
-
-    // Security: Reject messages from unauthorized sources
     if (!isValidSender) {
       console.warn('[TermCheck Content] Rejected message from unauthorized sender:', senderInfo);
       sendResponse({
@@ -58,24 +101,10 @@
     }
 
     if (msg.type === 'GET_PAGE_CONTENT') {
-      // Wait for document to be ready
       if (document.readyState !== 'complete') {
-        console.log('[TermCheck Content] Document not ready, waiting...');
-
-        // Wait for document to be ready
-        const waitForReady = () => {
-          if (document.readyState === 'complete') {
-            processContentExtraction();
-          } else {
-            setTimeout(waitForReady, 100);
-          }
-        };
-
         const processContentExtraction = () => {
           try {
             const isLegal = isLegalPage();
-
-            // Enhanced content extraction with validation
             const content = extractPageContent();
             const pageInfo = {
               url: window.location.href,
@@ -88,21 +117,14 @@
               documentReady: document.readyState
             };
 
-            console.log(`[TermCheck Content] Page analysis complete:`, pageInfo);
-
             sendResponse({
               success: true,
               isLegal,
               content,
               pageInfo,
-              senderValidation: {
-                validated: true,
-                senderId: sender.id,
-                timestamp: senderInfo.timestamp
-              }
+              senderValidation: { validated: true, senderId: sender.id, timestamp: senderInfo.timestamp }
             });
           } catch (error) {
-            console.error('[TermCheck Content] Error extracting page content:', error);
             sendResponse({
               success: false,
               error: 'Failed to extract page content',
@@ -111,15 +133,20 @@
           }
         };
 
+        const waitForReady = () => {
+          if (document.readyState === 'complete') {
+            processContentExtraction();
+          } else {
+            setTimeout(waitForReady, 100);
+          }
+        };
+
         waitForReady();
-        return true; // Asynchronous response
+        return true;
       }
 
-      // Document is ready, process immediately
       try {
         const isLegal = isLegalPage();
-
-        // Enhanced content extraction with validation
         const content = extractPageContent();
         const pageInfo = {
           url: window.location.href,
@@ -132,32 +159,24 @@
           documentReady: document.readyState
         };
 
-        console.log(`[TermCheck Content] Page analysis complete:`, pageInfo);
-
         sendResponse({
           success: true,
           isLegal,
           content,
           pageInfo,
-          senderValidation: {
-            validated: true,
-            senderId: sender.id,
-            timestamp: senderInfo.timestamp
-          }
+          senderValidation: { validated: true, senderId: sender.id, timestamp: senderInfo.timestamp }
         });
       } catch (error) {
-        console.error('[TermCheck Content] Error extracting page content:', error);
         sendResponse({
           success: false,
           error: 'Failed to extract page content',
           details: error instanceof Error ? error.message : 'Unknown error'
         });
       }
-      return false; // Synchronous response
+      return false;
     }
 
     if (msg.type === 'GET_PAGE_METADATA') {
-      // Provide enhanced metadata about the current page
       const metadata = {
         url: window.location.href,
         title: document.title,
@@ -168,20 +187,15 @@
         searchParams: window.location.search,
         lastModified: document.lastModified,
         documentReady: document.readyState,
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight
-        },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
         userAgent: navigator.userAgent,
         timestamp: Date.now()
       };
 
-      console.log(`[TermCheck Content] Metadata request from extension:`, metadata);
       sendResponse({ success: true, metadata });
       return false;
     }
 
-    console.warn('[TermCheck Content] Unknown message type:', msg.type);
     sendResponse({
       success: false,
       error: `Unknown message type: ${msg.type}`,
@@ -190,68 +204,22 @@
     return false;
   });
 
-  /**
-   * Enhanced content extraction with better filtering and validation
-   */
-  function extractPageContent(): string {
-    try {
-      // Remove script and style elements
-      const elementsToRemove = document.querySelectorAll('script, style, noscript, iframe, object, embed');
-      elementsToRemove.forEach(el => el.remove());
-
-      // Get main content areas first (article, main, content divs)
-      let content = '';
-
-      for (const selector of CONTENT_CONFIG.CONTENT_SELECTORS) {
-        const element = document.querySelector(selector) as HTMLElement;
-        if (element) {
-          content = element.innerText;
-          break;
-        }
-      }
-
-      // Fallback to body content if no main content found
-      if (!content) {
-        content = document.body.innerText;
-      }
-
-      // Clean up the content
-      content = content
-        .replace(/\s+/g, ' ') // Normalize whitespace
-        .replace(/\n\s*\n/g, '\n\n') // Normalize line breaks
-        .trim();
-
-      // Limit content length to prevent memory issues
-      if (content.length > CONTENT_CONFIG.MAX_CONTENT_LENGTH) {
-        console.warn(`[TermCheck Content] Content truncated from ${content.length} to ${CONTENT_CONFIG.MAX_CONTENT_LENGTH} characters`);
-        content = content.substring(0, CONTENT_CONFIG.MAX_CONTENT_LENGTH) + '... [truncated]';
-      }
-
-      return content;
-    } catch (error) {
-      console.error('[TermCheck Content] Content extraction failed:', error);
-      // Fallback to basic body text
-      return document.body?.innerText || '';
-    }
-  }
-
-  /**
-   * Monitor for page changes and notify extension
-   */
+  // Improved URL monitoring: capture oldUrl BEFORE updating lastUrl
   let lastUrl = window.location.href;
   let urlCheckInterval: number;
 
   function startUrlMonitoring() {
     urlCheckInterval = window.setInterval(() => {
-      if (window.location.href !== lastUrl) {
-        console.log(`[TermCheck Content] URL changed: ${lastUrl} -> ${window.location.href}`);
-        lastUrl = window.location.href;
+      const currentUrl = window.location.href;
+      if (currentUrl !== lastUrl) {
+        const oldUrl = lastUrl;
+        lastUrl = currentUrl;
+        console.log(`[TermCheck Content] URL changed: ${oldUrl} -> ${currentUrl}`);
 
-        // Notify extension about URL change
         chrome.runtime.sendMessage({
           type: 'URL_CHANGED',
-          oldUrl: lastUrl,
-          newUrl: window.location.href,
+          oldUrl: oldUrl,
+          newUrl: currentUrl,
           timestamp: Date.now()
         }).catch(error => {
           console.warn('[TermCheck Content] Failed to notify extension of URL change:', error);
@@ -260,17 +228,15 @@
     }, CONTENT_CONFIG.URL_CHECK_INTERVAL);
   }
 
-  // Start monitoring when content script loads
   startUrlMonitoring();
 
-  // Cleanup on page unload
   window.addEventListener("beforeunload", () => {
     if (urlCheckInterval) {
       clearInterval(urlCheckInterval);
     }
   });
 
-  // Signal that content script is ready
+  // Signal ready state
   if (document.readyState === 'complete') {
     console.log('[TermCheck Content] Content script loaded and ready');
   } else {

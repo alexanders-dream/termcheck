@@ -2,9 +2,20 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, readdirSync } from 'node:fs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+function copyIconsToDist() {
+  const publicDir = resolve(__dirname, 'public');
+  const distDir = resolve(__dirname, 'dist');
+  const files = readdirSync(publicDir);
+  for (const file of files) {
+    if (file.endsWith('.png') || file.endsWith('.svg') || file.endsWith('.json')) {
+      copyFileSync(resolve(publicDir, file), resolve(distDir, file));
+    }
+  }
+}
 
 export default defineConfig({
   plugins: [
@@ -12,16 +23,7 @@ export default defineConfig({
     {
       name: 'copy-extension-files',
       closeBundle() {
-        // Copy manifest.json to dist root
-        copyFileSync(
-          resolve(__dirname, 'manifest.json'),
-          resolve(__dirname, 'dist/manifest.json')
-        );
-        // Copy vite.svg to dist
-        copyFileSync(
-          resolve(__dirname, 'public/vite.svg'),
-          resolve(__dirname, 'dist/vite.svg')
-        );
+        copyIconsToDist();
         console.log('Extension files copied to dist/');
       },
     },
@@ -37,16 +39,14 @@ export default defineConfig({
         entryFileNames: '[name].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]',
-        format: 'es', // Use ES format for all outputs
+        format: 'es',
       },
-      // Don't externalize anything - bundle everything
       external: () => false,
     },
-    // Inline all dependencies to avoid import issues
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: false, // Keep console logs for debugging
+        drop_console: false,
       },
     },
   },

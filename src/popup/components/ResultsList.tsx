@@ -1,21 +1,24 @@
 import { LegalFlag } from '../../lib/types';
 import { Card, CardContent } from './ui/Card';
 import { Badge } from './ui/Badge';
-import { AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { AlertTriangle, Info, AlertCircle, Download, RefreshCw } from 'lucide-react';
+import { downloadMarkdownReport, downloadJSONReport } from '../../lib/reports';
 
 interface ResultsListProps {
     flags: LegalFlag[];
     onRescan: () => void;
+    pageUrl: string;
+    pageTitle: string;
 }
 
-export const ResultsList = ({ flags, onRescan }: ResultsListProps) => {
+export const ResultsList = ({ flags, onRescan, pageUrl, pageTitle }: ResultsListProps) => {
     const getSeverityIcon = (severity: string) => {
         switch (severity.toLowerCase()) {
-            case 'critical': return <AlertCircle className="h-5 w-5 text-red-600" />;
-            case 'high': return <AlertTriangle className="h-5 w-5 text-orange-500" />;
-            case 'medium': return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-            case 'low': return <Info className="h-5 w-5 text-blue-500" />;
-            default: return <Info className="h-5 w-5 text-slate-500" />;
+            case 'critical': return <AlertCircle className="h-5 w-5 text-red-700" aria-label="Critical severity" />;
+            case 'high': return <AlertTriangle className="h-5 w-5 text-orange-500" aria-label="High severity" />;
+            case 'medium': return <AlertTriangle className="h-5 w-5 text-yellow-500" aria-label="Medium severity" />;
+            case 'low': return <Info className="h-5 w-5 text-blue-500" aria-label="Low severity" />;
+            default: return <Info className="h-5 w-5 text-slate-500" aria-label="Unknown severity" />;
         }
     };
 
@@ -43,21 +46,61 @@ export const ResultsList = ({ flags, onRescan }: ResultsListProps) => {
         return getSeverityWeight(b.severity) - getSeverityWeight(a.severity);
     });
 
+    const criticalCount = flags.filter(f => f.severity === 'Critical').length;
+    const highCount = flags.filter(f => f.severity === 'High').length;
+    const overallRisk = criticalCount > 0 ? 'Critical' : highCount > 0 ? 'High' : flags.some(f => f.severity === 'Medium') ? 'Medium' : 'Low';
+
     return (
-        <div className="space-y-4 pb-4">
+        <div className="space-y-4 pb-4" role="region" aria-label="Analysis results">
             <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg font-semibold text-slate-900">Findings ({flags.length})</h2>
+                <h2 className="text-lg font-semibold text-slate-900" id="findings-heading">Findings ({flags.length})</h2>
                 <button
                     onClick={onRescan}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                    aria-label="Rescan current page"
                 >
+                    <RefreshCw className="h-3.5 w-3.5" />
                     Rescan Page
                 </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Overall Risk Summary */}
+            <div className={`p-3 rounded-lg border ${overallRisk === 'Critical' ? 'bg-red-50 border-red-200 text-red-800' : overallRisk === 'High' ? 'bg-orange-50 border-orange-200 text-orange-800' : overallRisk === 'Medium' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">Overall Risk:</span>
+                    <span className="text-sm font-bold uppercase">{overallRisk}</span>
+                </div>
+                <div className="flex gap-4 mt-2 text-xs">
+                    <span>Critical: {criticalCount}</span>
+                    <span>High: {highCount}</span>
+                    <span>Medium: {flags.filter(f => f.severity === 'Medium').length}</span>
+                    <span>Low: {flags.filter(f => f.severity === 'Low').length}</span>
+                </div>
+            </div>
+
+            {/* Download Buttons */}
+            <div className="flex gap-2">
+                <button
+                    onClick={() => downloadMarkdownReport(flags, pageUrl, pageTitle)}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    aria-label="Download Markdown report"
+                >
+                    <Download className="h-3.5 w-3.5" />
+                    Export Markdown
+                </button>
+                <button
+                    onClick={() => downloadJSONReport(flags, pageUrl, pageTitle)}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    aria-label="Download JSON report"
+                >
+                    <Download className="h-3.5 w-3.5" />
+                    Export JSON
+                </button>
+            </div>
+
+            <div className="space-y-3" role="list" aria-labelledby="findings-heading">
                 {sortedFlags.map((flag, idx) => (
-                    <Card key={idx} className="overflow-hidden transition-all hover:shadow-md">
+                    <Card key={idx} className="overflow-hidden transition-all hover:shadow-md" role="listitem">
                         <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
@@ -84,8 +127,7 @@ export const ResultsList = ({ flags, onRescan }: ResultsListProps) => {
                             </div>
                         </CardContent>
                     </Card>
-                ))
-                }
+                ))}
             </div>
 
             <div className="mt-8 pt-6 border-t border-slate-200">
@@ -94,7 +136,7 @@ export const ResultsList = ({ flags, onRescan }: ResultsListProps) => {
                         Find this tool useful? Support its development!
                     </p>
                     <div className="flex justify-center">
-                        <a href="https://www.buymeacoffee.com/oguso" target="_blank" rel="noopener noreferrer" className="transition-transform hover:scale-105">
+                        <a href="https://www.buymeacoffee.com/oguso" target="_blank" rel="noopener noreferrer" className="transition-transform hover:scale-105" aria-label="Support the developer on Buy Me A Coffee">
                             <img
                                 src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png"
                                 alt="Buy Me A Coffee"

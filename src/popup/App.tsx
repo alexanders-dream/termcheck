@@ -3,9 +3,9 @@ import { AppSettings, LegalFlag, AIProvider, AIModel } from '../lib/types';
 import { AIService } from '../lib/ai/service';
 import { getModelsForProvider, getProviderConfig, fetchModelsForProvider } from '../lib/ai/providers';
 import { StorageService } from '../lib/storage';
+import { SecureStorage } from '../lib/secureStorage';
 import { UI_CONFIG, DEFAULT_SETTINGS } from '../lib/config';
 
-// Components
 import { Layout } from './components/Layout';
 import { Header } from './components/Header';
 import { AnalyzeView } from './components/AnalyzeView';
@@ -22,40 +22,51 @@ function TermCheckApp() {
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsSource, setModelsSource] = useState<'api' | 'cache' | 'minimal-fallback'>('minimal-fallback');
+  const [currentPageTitle, setCurrentPageTitle] = useState('');
+  const [currentPageUrl, setCurrentPageUrl] = useState('');
 
   const { toast } = useToast();
 
+  // Initialize: load settings and migrate legacy keys
   useEffect(() => {
-    // Load settings on mount
-    chrome.storage.local.get(['settings'], async (res) => {
-      if (res.settings) {
-        let migratedSettings = res.settings;
+    (async () => {
+      // Try secure migration first
+      await SecureStorage.migrateLegacySettings();
 
-        setSettings(migratedSettings);
-        // Load models for the saved provider
-        await loadModelsForProvider(migratedSettings.provider, migratedSettings.apiKeys[migratedSettings.provider]);
-      } else {
-        setView('settings');
-        // Load default models for OpenAI
-        const models = await getModelsForProvider('openai');
-        setAvailableModels(models);
-      }
-      setIsInitializing(false);
-    });
+      chrome.storage.local.get(['settings'], async (res) => {
+        if (res.settings) {
+          const migratedSettings = { ...DEFAULT_SETTINGS, ...res.settings };
+          // Restore API keys from secure storage
+          try {
+            const secureKeys = await SecureStorage.getApiKeys();
+            migratedSettings.apiKeys = { ...migratedSettings.apiKeys, ...secureKeys };
+          } catch (e) {
+            console.warn('[App] Could not restore secure keys', e);
+          }
+          setSettings(migratedSettings);
+          await loadModelsForProvider(migratedSettings.provider, migratedSettings.apiKeys[migratedSettings.provider]);
+        } else {
+          setView('settings');
+          const models = await getModelsForProvider('openai');
+          setAvailableModels(models);
+        }
+        setIsInitializing(false);
+      });
 
-    // Cleanup expired results on startup
-    StorageService.cleanupExpiredResults();
+      // Cleanup old results
+      try { await StorageService.cleanupExpiredResults(); } catch { /* ignore */ }
+    })();
   }, []);
 
-  // Check for cached results when the popup opens
+  // Check for cached results and capture page info
   useEffect(() => {
     const checkCache = async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab?.url) {
         const cachedFlags = await StorageService.getAnalysisResult(tab.url);
-        if (cachedFlags) {
-          setFlags(cachedFlags);
-        }
+        if (cachedFlags) { setFlags(cachedFlags); }
+        setCurrentPageUrl(tab.url);
+        setCurrentPageTitle(tab.title || '');
       }
     };
     checkCache();
@@ -68,16 +79,11 @@ function TermCheckApp() {
       setAvailableModels(result.models);
       setModelsSource(result.source);
 
-      // If current model is not in the new list, switch to the first available one
       if (result.models.length > 0) {
         setSettings(prev => {
           const currentModelExists = result.models.some(m => m.id === prev.model);
           if (!currentModelExists) {
-            console.log(`[App] Current model ${prev.model} not found in new list, switching to ${result.models[0].id}`);
-            return {
-              ...prev,
-              model: result.models[0].id
-            };
+            return { ...prev, model: result.models[0].id };
           }
           return prev;
         });
@@ -91,9 +97,7 @@ function TermCheckApp() {
       const models = await getModelsForProvider(provider);
       setAvailableModels(models);
       setModelsSource('minimal-fallback');
-      if (forceRefresh) {
-        toast('Failed to refresh models', 'error');
-      }
+      if (forceRefresh) { toast('Failed to refresh models', 'error'); }
     } finally {
       setModelsLoading(false);
     }
@@ -102,11 +106,7 @@ function TermCheckApp() {
   const handleProviderChange = async (provider: AIProvider) => {
     const apiKey = settings.apiKeys[provider];
     const defaultModel = await AIService.getDefaultModel(provider, apiKey);
-    setSettings(prev => ({
-      ...prev,
-      provider,
-      model: defaultModel
-    }));
+    setSettings(prev => ({ ...prev, provider, model: defaultModel }));
     setValidationError('');
     await loadModelsForProvider(provider, apiKey);
   };
@@ -119,10 +119,7 @@ function TermCheckApp() {
   const handleApiKeyChange = async (apiKey: string) => {
     setSettings(prev => ({
       ...prev,
-      apiKeys: {
-        ...prev.apiKeys,
-        [prev.provider]: apiKey
-      }
+      apiKeys: { ...prev.apiKeys, [prev.provider]: apiKey }
     }));
     setValidationError('');
     if (apiKey) {
@@ -134,7 +131,7 @@ function TermCheckApp() {
     }
   };
 
-  const saveSettings = () => {
+  const saveSettings = async () => {
     const validation = AIService.validateSettings(settings, availableModels);
     if (!validation.valid) {
       setValidationError(validation.error || 'Invalid settings');
@@ -142,6 +139,14 @@ function TermCheckApp() {
       return;
     }
 
+    // Persist API keys securely
+    try {
+      await SecureStorage.saveApiKeys(settings.apiKeys);
+    } catch (e) {
+      console.warn('[App] Failed to secure API keys', e);
+    }
+
+    // Save settings (apiKeys are kept for backwards compat but secured separately)
     chrome.storage.local.set({ settings }, () => {
       setValidationError('');
       setView('analyze');
@@ -157,6 +162,9 @@ function TermCheckApp() {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab.id) return;
 
+      setCurrentPageUrl(tab.url || '');
+      setCurrentPageTitle(tab.title || '');
+
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -168,7 +176,7 @@ function TermCheckApp() {
 
       await new Promise(resolve => setTimeout(resolve, UI_CONFIG.CONTENT_SCRIPT_READY_DELAY));
 
-      let contentRes;
+      let contentRes: { success: boolean; content?: string; isLegal?: boolean; error?: string } | undefined;
       let retries = UI_CONFIG.RETRY_COUNT;
 
       while (retries > 0) {
@@ -178,9 +186,7 @@ function TermCheckApp() {
 
           if (contentRes && !contentRes.success) {
             console.error('Content script error:', contentRes.error);
-            if (retries === 1) {
-              throw new Error(contentRes.error || 'Failed to extract page content');
-            }
+            if (retries === 1) { throw new Error(contentRes.error || 'Failed to extract page content'); }
           }
 
           if (!contentRes || !contentRes.content) {
@@ -218,7 +224,6 @@ function TermCheckApp() {
 
       if (response.success) {
         setFlags(response.data);
-        // Cache the results
         if (tab.url) {
           await StorageService.saveAnalysisResult(tab.url, response.data);
         }
@@ -229,7 +234,6 @@ function TermCheckApp() {
     } catch (err) {
       console.error('Analysis error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-
       if (errorMessage.includes('Could not establish connection')) {
         toast('Unable to connect to the page. Try refreshing.', 'error');
       } else {
@@ -244,7 +248,7 @@ function TermCheckApp() {
     return (
       <div className={`w-[${UI_CONFIG.EXTENSION_WIDTH}px] min-h-[${UI_CONFIG.EXTENSION_MIN_HEIGHT}px] bg-slate-50 p-4 flex items-center justify-center`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" role="status" aria-label="Loading"></div>
           <p className="text-slate-600">Loading configuration...</p>
         </div>
       </div>
@@ -279,6 +283,8 @@ function TermCheckApp() {
             loading={loading}
             flags={flags}
             onAnalyze={analyzePage}
+            pageUrl={currentPageUrl}
+            pageTitle={currentPageTitle}
           />
         )}
       </main>
