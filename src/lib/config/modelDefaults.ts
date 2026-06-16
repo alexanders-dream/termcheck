@@ -43,6 +43,26 @@ export const PROVIDER_CONFIGS = {
     baseUrl: 'http://localhost:11434/api',
     apiKeyUrl: '',
     requiresApiKey: false
+  },
+  deepseek: {
+    baseUrl: 'https://api.deepseek.com/v1',
+    apiKeyUrl: 'https://platform.deepseek.com/api_keys',
+    requiresApiKey: true
+  },
+  moonshot: {
+    baseUrl: 'https://api.moonshot.cn/v1',
+    apiKeyUrl: 'https://platform.moonshot.cn/api',
+    requiresApiKey: true
+  },
+  zai: {
+    baseUrl: 'https://api.zai.dev/v1',
+    apiKeyUrl: 'https://zai.dev/settings/api-keys',
+    requiresApiKey: true
+  },
+  nvidia: {
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    apiKeyUrl: 'https://build.nvidia.com/api-keys',
+    requiresApiKey: true
   }
 };
 
@@ -97,7 +117,11 @@ export const DEFAULT_SETTINGS = {
     groq: '',
     gemini: '',
     openrouter: '',
-    ollama: ''
+    ollama: '',
+    deepseek: '',
+    moonshot: '',
+    zai: '',
+    nvidia: ''
   }
 };
 

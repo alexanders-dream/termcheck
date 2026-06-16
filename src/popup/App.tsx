@@ -158,7 +158,11 @@ function TermCheckApp() {
       console.warn('[App] Failed to secure API keys', e);
     }
 
-    chrome.storage.local.set({ settings }, () => {
+    // Strip apiKeys before saving settings to chrome.storage.local to keep them in secure storage only
+    const settingsToSave = { ...settings };
+    delete (settingsToSave as any).apiKeys;
+
+    chrome.storage.local.set({ settings: settingsToSave }, () => {
       setValidationError('');
       setIsDirty(false);
       setView('analyze');

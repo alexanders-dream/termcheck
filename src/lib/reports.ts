@@ -29,7 +29,7 @@ const getSeverityColor = (severity: string) => {
 function generateReportHtml(flags: LegalFlag[], pageUrl: string, _pageTitle: string) {
   const sorted = sortFlags(flags);
   const now = new Date().toLocaleString();
-  
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,8 +47,8 @@ function generateReportHtml(flags: LegalFlag[], pageUrl: string, _pageTitle: str
     .severity-card { padding: 12px; border-radius: 8px; text-align: center; }
     .severity-card .count { font-size: 24px; font-weight: 700; }
     .severity-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; }
-    .findings-list { space: 16px; }
-    .finding-card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); page-break-inside: avoid; }
+    .findings-list { margin-top: 16px; }
+    .finding-card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); page-break-inside: avoid; break-inside: avoid; }
     .finding-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
     .category { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
     .severity-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; }
@@ -56,8 +56,9 @@ function generateReportHtml(flags: LegalFlag[], pageUrl: string, _pageTitle: str
     .quote { background: #f3f4f6; border-left: 3px solid #d1d5db; padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 13px; color: #4b5563; font-style: italic; }
     .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
     @media print {
+      @page { margin: 15mm; }
       body { padding: 0; background: white; }
-      .finding-card { box-shadow: none; border: 1px solid #e5e7eb; }
+      .finding-card { box-shadow: none; border: 1px solid #e5e7eb; page-break-inside: avoid; break-inside: avoid; }
     }
   </style>
 </head>
@@ -124,31 +125,86 @@ export async function downloadPDFReport(flags: LegalFlag[], pageUrl: string, pag
   element.innerHTML = html;
   element.style.position = 'absolute';
   element.style.left = '-9999px';
-  element.style.width = '800px';
+  element.style.width = '210mm';
   document.body.appendChild(element);
 
   try {
+    // Allow fonts/styles to settle before capturing
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Render the full off-screen element to a single canvas
     const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-    const imgData = canvas.toDataURL('image/jpeg', 0.98);
-
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const pdfWidth = pdf.internal.pageSize.getWidth(); // 210
+    const pdfHeight = pdf.internal.pageSize.getHeight(); // 297
 
-    const imgProps = pdf.getImageProperties(imgData);
-    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    // A4 height in CSS pixels (96 DPI)
+    const pxPerMm = 96 / 25.4;
+    const pageHeightPx = pdfHeight * pxPerMm; // ~1123 CSS px
+    const totalHeight = element.scrollHeight;
+    const scaleFactor = canvas.width / element.offsetWidth;
 
-    let heightLeft = imgHeight;
-    let position = 0;
+    // Identify elements that must not be split across pages
+    const nonSplittableEls = Array.from(element.querySelectorAll('.finding-card, .footer')) as HTMLElement[];
 
-    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
-    heightLeft -= pdfHeight;
+    // Greedy page-range builder: ensures no non-splittable element straddles a boundary
+    const pageRanges: [number, number][] = [];
+    let pageStart = 0;
+    let pageEnd = Math.min(pageStart + pageHeightPx, totalHeight);
 
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
-      heightLeft -= pdfHeight;
+    while (pageStart < totalHeight) {
+      let adjustedEnd = pageEnd;
+
+      for (const el of nonSplittableEls) {
+        const top = el.offsetTop;
+        const bottom = top + el.offsetHeight;
+        if (top < adjustedEnd && bottom > adjustedEnd) {
+          // Move boundary to the top of this element so it falls on the next page
+          adjustedEnd = top;
+        }
+      }
+
+      // Guaranteed progress safeguard (e.g., card taller than a full page)
+      if (adjustedEnd <= pageStart) {
+        adjustedEnd = pageEnd;
+      }
+
+      pageRanges.push([pageStart, Math.min(adjustedEnd, totalHeight)]);
+      pageStart = adjustedEnd;
+      pageEnd = Math.min(pageStart + pageHeightPx, totalHeight);
+    }
+
+    // Build each PDF page from the corresponding canvas slice
+    for (let i = 0; i < pageRanges.length; i++) {
+      const [startPx, endPx] = pageRanges[i];
+      const sliceHeightPx = endPx - startPx;
+
+      if (i > 0) {
+        pdf.addPage();
+      }
+
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = Math.round(sliceHeightPx * scaleFactor);
+      const ctx = sliceCanvas.getContext('2d');
+      if (!ctx) continue;
+
+      ctx.drawImage(
+        canvas,
+        0,
+        Math.round(startPx * scaleFactor),
+        canvas.width,
+        Math.round(sliceHeightPx * scaleFactor),
+        0,
+        0,
+        sliceCanvas.width,
+        sliceCanvas.height
+      );
+
+      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.98);
+      const sliceHeightMm = (sliceCanvas.height / canvas.width) * pdfWidth;
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, sliceHeightMm);
     }
 
     pdf.save(`TermCheck_Report_${pageTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);

@@ -2,6 +2,7 @@ import { AIService } from '../lib/ai/service';
 import { SYSTEM_PROMPT } from '../lib/prompts';
 import { AppSettings, LegalFlag } from '../lib/types';
 import { getProviderConfig } from '../lib/ai/providers';
+import { SecureStorage } from '../lib/secureStorage';
 
 // Context menu for quick analysis
 chrome.runtime.onInstalled.addListener(() => {
@@ -59,6 +60,14 @@ async function handleAnalysis(
   try {
     const storage = await chrome.storage.local.get(['settings']);
     const settings: AppSettings = storage.settings;
+
+    // Restore API keys from secure storage
+    try {
+      const secureKeys = await SecureStorage.getApiKeys();
+      settings.apiKeys = { ...settings.apiKeys, ...secureKeys };
+    } catch (e) {
+      console.warn('[Background] Could not restore secure keys', e);
+    }
 
     const providerConfig = getProviderConfig(settings.provider);
     if (providerConfig?.requiresApiKey && !settings?.apiKeys?.[settings.provider]) {

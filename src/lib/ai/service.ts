@@ -6,6 +6,10 @@ import {
   analyzeWithGemini,
   analyzeWithOpenRouter,
   analyzeWithOllama,
+  analyzeWithDeepseek,
+  analyzeWithMoonshot,
+  analyzeWithZAI,
+  analyzeWithNvidia,
 } from './adapters';
 import { getProviderConfig, getModelById, getModelsForProvider } from './providers';
 import { chunkText, mergeFlags, getChunkSize } from '../chunking';
@@ -148,6 +152,14 @@ export class AIService {
         return await analyzeWithOpenRouter(text, apiKey, systemPrompt, model);
       case 'ollama':
         return await analyzeWithOllama(text, apiKey, systemPrompt, model);
+      case 'deepseek':
+        return await analyzeWithDeepseek(text, apiKey, systemPrompt, model);
+      case 'moonshot':
+        return await analyzeWithMoonshot(text, apiKey, systemPrompt, model);
+      case 'zai':
+        return await analyzeWithZAI(text, apiKey, systemPrompt, model);
+      case 'nvidia':
+        return await analyzeWithNvidia(text, apiKey, systemPrompt, model);
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }

@@ -199,6 +199,102 @@ export async function analyzeWithGemini(
   return extractFlagsFromText(content);
 }
 
+// --- DeepSeek (OpenAI-compatible) ---
+export async function analyzeWithDeepseek(
+  text: string,
+  apiKey: string,
+  systemPrompt: string,
+  model: string
+): Promise<LegalFlag[]> {
+  const data = await postJSON<{
+    choices: { message: { content: string } }[];
+  }>('https://api.deepseek.com/v1/chat/completions', { Authorization: `Bearer ${apiKey}` }, {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Analyze this legal text: ${safeTruncate(text)}` },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 4096,
+  });
+
+  const content = JSON.parse(data.choices[0].message.content);
+  return content.flags || [];
+}
+
+// --- Moonshot (OpenAI-compatible) ---
+export async function analyzeWithMoonshot(
+  text: string,
+  apiKey: string,
+  systemPrompt: string,
+  model: string
+): Promise<LegalFlag[]> {
+  const data = await postJSON<{
+    choices: { message: { content: string } }[];
+  }>('https://api.moonshot.cn/v1/chat/completions', { Authorization: `Bearer ${apiKey}` }, {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Analyze this legal text: ${safeTruncate(text)}` },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 4096,
+  });
+
+  const content = JSON.parse(data.choices[0].message.content);
+  return content.flags || [];
+}
+
+// --- ZAI (OpenAI-compatible) ---
+export async function analyzeWithZAI(
+  text: string,
+  apiKey: string,
+  systemPrompt: string,
+  model: string
+): Promise<LegalFlag[]> {
+  const data = await postJSON<{
+    choices: { message: { content: string } }[];
+  }>('https://api.zai.dev/v1/chat/completions', { Authorization: `Bearer ${apiKey}` }, {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Analyze this legal text: ${safeTruncate(text)}` },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 4096,
+  });
+
+  const content = JSON.parse(data.choices[0].message.content);
+  return content.flags || [];
+}
+
+// --- NVIDIA (OpenAI-compatible) ---
+export async function analyzeWithNvidia(
+  text: string,
+  apiKey: string,
+  systemPrompt: string,
+  model: string
+): Promise<LegalFlag[]> {
+  const data = await postJSON<{
+    choices: { message: { content: string } }[];
+  }>('https://integrate.api.nvidia.com/v1/chat/completions', { Authorization: `Bearer ${apiKey}` }, {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Analyze this legal text: ${safeTruncate(text)}` },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 4096,
+  });
+
+  const content = JSON.parse(data.choices[0].message.content);
+  return content.flags || [];
+}
+
 // --- Ollama ---
 export async function analyzeWithOllama(
   text: string,

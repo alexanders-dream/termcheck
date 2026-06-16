@@ -48,8 +48,12 @@ export const SecureStorage = {
 
   async migrateLegacySettings(): Promise<void> {
     // Migrate old plaintext settings to secure storage
-    const result = await chrome.storage.local.get(['settings']);
-    if (!result.settings?.apiKeys) return;
+    const result = await chrome.storage.local.get(['settings', '_migrated_v1']);
+    if (result._migrated_v1 && !result.settings?.apiKeys) return;
+    if (!result.settings?.apiKeys) {
+      await chrome.storage.local.set({ _migrated_v1: true });
+      return;
+    }
 
     const keys = result.settings.apiKeys;
     await SecureStorage.saveApiKeys(keys);

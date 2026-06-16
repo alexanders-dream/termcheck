@@ -12,7 +12,7 @@ export interface AnalysisResult {
   overallRisk: Severity;
 }
 
-export type AIProvider = 'openai' | 'anthropic' | 'groq' | 'gemini' | 'openrouter' | 'ollama';
+export type AIProvider = 'openai' | 'anthropic' | 'groq' | 'gemini' | 'openrouter' | 'ollama' | 'deepseek' | 'moonshot' | 'zai' | 'nvidia';
 
 export interface AppSettings {
   provider: AIProvider;

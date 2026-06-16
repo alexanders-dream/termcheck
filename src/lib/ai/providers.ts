@@ -63,6 +63,38 @@ export const MINIMAL_FALLBACKS: Record<AIProvider, AIModel> = {
     contextWindow: 8192,
     maxOutputTokens: 4096,
     supported: true
+  },
+  deepseek: {
+    id: 'deepseek-chat',
+    name: 'DeepSeek Chat',
+    provider: 'deepseek',
+    contextWindow: 64000,
+    maxOutputTokens: 8192,
+    supported: true
+  },
+  moonshot: {
+    id: 'moonshot-v1-8k',
+    name: 'Moonshot v1 8K',
+    provider: 'moonshot',
+    contextWindow: 8192,
+    maxOutputTokens: 4096,
+    supported: true
+  },
+  zai: {
+    id: 'zai-chat',
+    name: 'ZAI Chat',
+    provider: 'zai',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    supported: true
+  },
+  nvidia: {
+    id: 'nvidia/llama-3.1-nemotron-70b-instruct',
+    name: 'Llama 3.1 Nemotron 70B',
+    provider: 'nvidia',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    supported: true
   }
 };
 
@@ -114,6 +146,38 @@ export const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
     models: [],
     requiresApiKey: false,
     apiKeyUrl: ''
+  },
+  deepseek: {
+    name: 'deepseek',
+    displayName: 'DeepSeek',
+    baseUrl: CONFIG_PROVIDER_CONFIGS.deepseek.baseUrl,
+    models: [],
+    requiresApiKey: true,
+    apiKeyUrl: CONFIG_PROVIDER_CONFIGS.deepseek.apiKeyUrl
+  },
+  moonshot: {
+    name: 'moonshot',
+    displayName: 'Moonshot',
+    baseUrl: CONFIG_PROVIDER_CONFIGS.moonshot.baseUrl,
+    models: [],
+    requiresApiKey: true,
+    apiKeyUrl: CONFIG_PROVIDER_CONFIGS.moonshot.apiKeyUrl
+  },
+  zai: {
+    name: 'zai',
+    displayName: 'ZAI',
+    baseUrl: CONFIG_PROVIDER_CONFIGS.zai.baseUrl,
+    models: [],
+    requiresApiKey: true,
+    apiKeyUrl: CONFIG_PROVIDER_CONFIGS.zai.apiKeyUrl
+  },
+  nvidia: {
+    name: 'nvidia',
+    displayName: 'NVIDIA',
+    baseUrl: CONFIG_PROVIDER_CONFIGS.nvidia.baseUrl,
+    models: [],
+    requiresApiKey: true,
+    apiKeyUrl: CONFIG_PROVIDER_CONFIGS.nvidia.apiKeyUrl
   }
 };
 
@@ -219,6 +283,18 @@ export async function fetchModelsForProvider(provider: AIProvider, apiKey: strin
         break;
       case 'ollama':
         models = await fetchOllamaModels();
+        break;
+      case 'deepseek':
+        models = await fetchDeepseekModels(apiKey);
+        break;
+      case 'moonshot':
+        models = await fetchMoonshotModels(apiKey);
+        break;
+      case 'zai':
+        models = await fetchZaiModels(apiKey);
+        break;
+      case 'nvidia':
+        models = await fetchNvidiaModels(apiKey);
         break;
     }
 
@@ -399,4 +475,76 @@ async function fetchOllamaModels(): Promise<AIModel[]> {
     console.error('Failed to fetch Ollama models:', error);
     throw error;
   }
+}
+
+async function fetchDeepseekModels(apiKey: string): Promise<AIModel[]> {
+  const response = await fetch('https://api.deepseek.com/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+
+  if (!response.ok) throw new Error('Failed to fetch DeepSeek models');
+
+  const data = await response.json();
+  return data.data.map((model: any) => ({
+    id: model.id,
+    name: model.id.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    provider: 'deepseek' as AIProvider,
+    contextWindow: 64000,
+    maxOutputTokens: 8192,
+    supported: true
+  }));
+}
+
+async function fetchMoonshotModels(apiKey: string): Promise<AIModel[]> {
+  const response = await fetch('https://api.moonshot.cn/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+
+  if (!response.ok) throw new Error('Failed to fetch Moonshot models');
+
+  const data = await response.json();
+  return data.data.map((model: any) => ({
+    id: model.id,
+    name: model.id.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    provider: 'moonshot' as AIProvider,
+    contextWindow: 8192,
+    maxOutputTokens: 4096,
+    supported: true
+  }));
+}
+
+async function fetchNvidiaModels(apiKey: string): Promise<AIModel[]> {
+  const response = await fetch('https://integrate.api.nvidia.com/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+
+  if (!response.ok) throw new Error('Failed to fetch NVIDIA models');
+
+  const data = await response.json();
+  return data.data.map((model: any) => ({
+    id: model.id,
+    name: model.id.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    provider: 'nvidia' as AIProvider,
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    supported: true
+  }));
+}
+
+async function fetchZaiModels(apiKey: string): Promise<AIModel[]> {
+  const response = await fetch('https://api.zai.dev/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+
+  if (!response.ok) throw new Error('Failed to fetch ZAI models');
+
+  const data = await response.json();
+  return data.data.map((model: any) => ({
+    id: model.id,
+    name: model.id.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    provider: 'zai' as AIProvider,
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    supported: true
+  }));
 }
