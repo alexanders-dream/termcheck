@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import browser from './browser';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -21,7 +22,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [theme, setThemeState] = useState<Theme>('system');
 
   useEffect(() => {
-    chrome.storage.local.get([STORAGE_KEY], (res) => {
+    browser.storage.local.get(STORAGE_KEY).then((res) => {
       const saved = res[STORAGE_KEY] as Theme | undefined;
       if (saved) {
         setThemeState(saved);
@@ -54,13 +55,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
-    chrome.storage.local.set({ [STORAGE_KEY]: newTheme });
+    browser.storage.local.set({ [STORAGE_KEY]: newTheme });
   }, []);
 
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => {
       const newTheme = prev === 'dark' ? 'light' : 'dark';
-      chrome.storage.local.set({ [STORAGE_KEY]: newTheme });
+      browser.storage.local.set({ [STORAGE_KEY]: newTheme });
       return newTheme;
     });
   }, []);

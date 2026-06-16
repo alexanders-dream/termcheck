@@ -31,9 +31,13 @@
     },
     "default_title": "TermCheck - Analyze Legal Documents"
   },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "termcheck@example.com"
+    }
+  },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
@@ -43,8 +47,7 @@
       "js": [
         "content.js"
       ],
-      "run_at": "document_end",
-      "type": "module"
+      "run_at": "document_end"
     }
   ],
   "declarative_net_request": {

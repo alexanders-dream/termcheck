@@ -7,6 +7,7 @@ import { StorageService } from '../lib/storage';
 import { SecureStorage } from '../lib/secureStorage';
 import { UI_CONFIG, DEFAULT_SETTINGS } from '../lib/config';
 import { extractPdfText } from '../lib/pdfExtractor';
+import browser from '../lib/browser';
 
 import { Layout } from './components/Layout';
 import { Header } from './components/Header';
@@ -37,24 +38,23 @@ function TermCheckApp() {
     (async () => {
       await SecureStorage.migrateLegacySettings();
 
-      chrome.storage.local.get(['settings'], async (res) => {
-        if (res.settings) {
-          const migratedSettings = { ...DEFAULT_SETTINGS, ...res.settings };
-          try {
-            const secureKeys = await SecureStorage.getApiKeys();
-            migratedSettings.apiKeys = { ...migratedSettings.apiKeys, ...secureKeys };
-          } catch (e) {
-            console.warn('[App] Could not restore secure keys', e);
-          }
-          setSettings(migratedSettings);
-          await loadModelsForProvider(migratedSettings.provider, migratedSettings.apiKeys[migratedSettings.provider]);
-        } else {
-          setView('settings');
-          const models = await getModelsForProvider('openai');
-          setAvailableModels(models);
+      const res = await browser.storage.local.get('settings');
+      if (res.settings) {
+        const migratedSettings = { ...DEFAULT_SETTINGS, ...res.settings };
+        try {
+          const secureKeys = await SecureStorage.getApiKeys();
+          migratedSettings.apiKeys = { ...migratedSettings.apiKeys, ...secureKeys };
+        } catch (e) {
+          console.warn('[App] Could not restore secure keys', e);
         }
-        setIsInitializing(false);
-      });
+        setSettings(migratedSettings);
+        await loadModelsForProvider(migratedSettings.provider, migratedSettings.apiKeys[migratedSettings.provider]);
+      } else {
+        setView('settings');
+        const models = await getModelsForProvider('openai');
+        setAvailableModels(models);
+      }
+      setIsInitializing(false);
 
       try { await StorageService.cleanupExpiredResults(); } catch { /* ignore */ }
     })();
@@ -63,7 +63,8 @@ function TermCheckApp() {
   // Check for cached results and capture page info
   useEffect(() => {
     const checkCache = async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs[0];
       if (tab?.url) {
         const cachedFlags = await StorageService.getAnalysisResult(tab.url);
         if (cachedFlags) { setFlags(cachedFlags); }
@@ -158,16 +159,15 @@ function TermCheckApp() {
       console.warn('[App] Failed to secure API keys', e);
     }
 
-    // Strip apiKeys before saving settings to chrome.storage.local to keep them in secure storage only
+    // Strip apiKeys before saving settings to browser.storage.local to keep them in secure storage only
     const settingsToSave = { ...settings };
     delete (settingsToSave as any).apiKeys;
 
-    chrome.storage.local.set({ settings: settingsToSave }, () => {
-      setValidationError('');
-      setIsDirty(false);
-      setView('analyze');
-      toast('Settings saved successfully', 'success');
-    });
+    await browser.storage.local.set({ settings: settingsToSave });
+    setValidationError('');
+    setIsDirty(false);
+    setView('analyze');
+    toast('Settings saved successfully', 'success');
   };
 
   const analyzePage = async () => {
@@ -175,8 +175,9 @@ function TermCheckApp() {
     setFlags([]);
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab.id) return;
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs[0];
+      if (!tab?.id) return;
 
       setCurrentPageUrl(tab.url || '');
       setCurrentPageTitle(tab.title || '');
@@ -199,7 +200,7 @@ function TermCheckApp() {
         }
       } else {
         try {
-          await chrome.scripting.executeScript({
+          await browser.scripting.executeScript({
             target: { tabId: tab.id },
             files: ['content.js']
           });
@@ -214,7 +215,7 @@ function TermCheckApp() {
 
         while (retries > 0) {
           try {
-            contentRes = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTENT' });
+            contentRes = await browser.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTENT' });
             if (contentRes && contentRes.success) break;
 
             if (contentRes && !contentRes.success) {
@@ -253,10 +254,10 @@ function TermCheckApp() {
         return;
       }
 
-      const response = await chrome.runtime.sendMessage({
+      const response = (await browser.runtime.sendMessage({
         type: 'ANALYZE_DOCUMENT',
         payload: content
-      });
+      })) as any;
 
       if (response.success) {
         setFlags(response.data);

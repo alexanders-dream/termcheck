@@ -3,63 +3,61 @@ import { SYSTEM_PROMPT } from '../lib/prompts';
 import { AppSettings, LegalFlag } from '../lib/types';
 import { getProviderConfig } from '../lib/ai/providers';
 import { SecureStorage } from '../lib/secureStorage';
+import browser from '../lib/browser';
 
 // Context menu for quick analysis
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
+browser.runtime.onInstalled.addListener(() => {
+  browser.contextMenus.create({
     id: 'termcheck-analyze',
     title: 'Analyze page with TermCheck',
     contexts: ['page', 'selection'],
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+browser.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'termcheck-analyze' && tab?.id) {
-    chrome.action.openPopup();
-    // Note: triggering analysis from context menu requires messaging to popup
-    // which is limited in Manifest V3; we open the popup for now
+    try {
+      await browser.action.openPopup();
+    } catch (e) {
+      console.warn('[TermCheck] Could not open popup from context menu:', e);
+    }
   }
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message: any, sender: any) => {
   const senderInfo = {
     id: sender.id,
     tabId: sender.tab?.id,
     url: sender.tab?.url,
     title: sender.tab?.title,
-    isExtension: sender.id === chrome.runtime.id,
+    isExtension: sender.id === browser.runtime.id,
     timestamp: new Date().toISOString()
   };
 
   if (!senderInfo.isExtension && !senderInfo.url) {
     console.warn('[TermCheck] Rejected message from untrusted source:', senderInfo);
-    sendResponse({ success: false, error: 'Unauthorized sender' });
-    return false;
+    return Promise.resolve({ success: false, error: 'Unauthorized sender' });
   }
 
   if (message.type === 'ANALYZE_DOCUMENT') {
-    handleAnalysis(message.payload, sendResponse, senderInfo);
-    return true;
+    return handleAnalysis(message.payload, senderInfo);
   }
 
   if (message.type === 'GET_ANALYSIS_STATUS') {
-    handleStatusRequest(sendResponse, senderInfo);
-    return false;
+    return handleStatusRequest(senderInfo);
   }
 
   console.warn('[TermCheck] Unknown message type:', message.type);
-  sendResponse({ success: false, error: 'Unknown message type' });
-  return false;
+  return Promise.resolve({ success: false, error: 'Unknown message type' });
 });
 
 async function handleAnalysis(
   text: string,
-  sendResponse: (response: any) => void,
   senderInfo: Record<string, any>
-) {
+): Promise<any> {
   try {
-    const storage = await chrome.storage.local.get(['settings']);
-    const settings: AppSettings = storage.settings;
+    const storage = await browser.storage.local.get(['settings']);
+    const settings: AppSettings = (storage as any).settings;
 
     // Restore API keys from secure storage
     try {
@@ -71,8 +69,7 @@ async function handleAnalysis(
 
     const providerConfig = getProviderConfig(settings.provider);
     if (providerConfig?.requiresApiKey && !settings?.apiKeys?.[settings.provider]) {
-      sendResponse({ success: false, error: `API Key missing for ${settings.provider}` });
-      return;
+      return { success: false, error: `API Key missing for ${settings.provider}` };
     }
 
     let flags: LegalFlag[] = [];
@@ -96,28 +93,26 @@ async function handleAnalysis(
       }
     };
 
-    await chrome.storage.local.set({ lastAnalysis: analysisResult });
+    await browser.storage.local.set({ lastAnalysis: analysisResult });
 
-    sendResponse({ success: true, data: flags, metadata: analysisResult.metadata });
+    return { success: true, data: flags, metadata: analysisResult.metadata };
   } catch (error) {
     console.error(`[TermCheck] Analysis failed:`, error);
-    sendResponse({ success: false, error: (error as Error).message });
+    return { success: false, error: (error as Error).message };
   }
 }
 
-function handleStatusRequest(sendResponse: (response: any) => void, senderInfo: Record<string, any>) {
-  chrome.storage.local.get(['lastAnalysis'], (result) => {
-    const lastAnalysis = result.lastAnalysis;
-    const status = {
-      hasAnalysis: !!lastAnalysis,
-      analysisAge: lastAnalysis ? Date.now() - lastAnalysis.timestamp : null,
-      flagsCount: lastAnalysis?.flags?.length || 0,
-      lastUrl: lastAnalysis?.metadata?.url,
-      currentTabUrl: senderInfo.url,
-      isSameUrl: lastAnalysis?.metadata?.url === senderInfo.url
-    };
+async function handleStatusRequest(senderInfo: Record<string, any>): Promise<any> {
+  const result = await browser.storage.local.get(['lastAnalysis']);
+  const lastAnalysis = (result as any).lastAnalysis;
+  const status = {
+    hasAnalysis: !!lastAnalysis,
+    analysisAge: lastAnalysis ? Date.now() - lastAnalysis.timestamp : null,
+    flagsCount: lastAnalysis?.flags?.length || 0,
+    lastUrl: lastAnalysis?.metadata?.url,
+    currentTabUrl: senderInfo.url,
+    isSameUrl: lastAnalysis?.metadata?.url === senderInfo.url
+  };
 
-    sendResponse({ success: true, status });
-  });
-  return false;
+  return { success: true, status };
 }

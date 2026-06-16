@@ -1,4 +1,5 @@
 import { AIProvider, AIModel } from '../types';
+import browser from '../browser';
 
 /**
  * Cache entry structure for storing model data
@@ -24,7 +25,7 @@ const CACHE_CONFIG = {
 
 /**
  * Model Cache Manager
- * Handles caching of AI models in chrome.storage.local with TTL support
+ * Handles caching of AI models in browser.storage.local with TTL support
  */
 export class ModelCacheManager {
     /**
@@ -34,7 +35,7 @@ export class ModelCacheManager {
     async getCachedModels(provider: AIProvider): Promise<ModelCache | null> {
         try {
             const key = this.getCacheKey(provider);
-            const result = await chrome.storage.local.get(key);
+            const result = await browser.storage.local.get(key);
 
             if (!result[key]) {
                 console.log(`[ModelCache] No cache found for ${provider}`);
@@ -85,7 +86,7 @@ export class ModelCacheManager {
                 version: CACHE_CONFIG.CACHE_VERSION,
             };
 
-            await chrome.storage.local.set({ [key]: cache });
+            await browser.storage.local.set({ [key]: cache });
             console.log(`[ModelCache] Cached ${models.length} models for ${provider}, TTL: ${ttl}ms`);
         } catch (error) {
             console.error(`[ModelCache] Error setting cache for ${provider}:`, error);
@@ -123,7 +124,7 @@ export class ModelCacheManager {
     async invalidateCache(provider: AIProvider): Promise<void> {
         try {
             const key = this.getCacheKey(provider);
-            await chrome.storage.local.remove(key);
+            await browser.storage.local.remove(key);
             console.log(`[ModelCache] Cache invalidated for ${provider}`);
         } catch (error) {
             console.error(`[ModelCache] Error invalidating cache for ${provider}:`, error);
@@ -137,7 +138,7 @@ export class ModelCacheManager {
         try {
             const providers: AIProvider[] = ['openai', 'anthropic', 'groq', 'gemini', 'openrouter', 'ollama', 'deepseek', 'moonshot', 'zai', 'nvidia'];
             const keys = providers.map(p => this.getCacheKey(p));
-            await chrome.storage.local.remove(keys);
+            await browser.storage.local.remove(keys);
             console.log('[ModelCache] All caches cleared');
         } catch (error) {
             console.error('[ModelCache] Error clearing all caches:', error);

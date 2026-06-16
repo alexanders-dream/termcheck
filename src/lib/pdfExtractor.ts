@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import browser from './browser';
 
 /**
  * Extract text from a PDF ArrayBuffer using pdfjs-dist.
@@ -6,7 +7,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 export async function extractPdfText(data: ArrayBuffer): Promise<string> {
   // Configure the worker path relative to the extension root.
   // The build step (vite.config.ts) copies pdf.worker.mjs into dist/.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL('pdf.worker.mjs');
 
   const pdf = await pdfjsLib.getDocument({ data }).promise;
   let fullText = '';

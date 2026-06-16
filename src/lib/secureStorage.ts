@@ -1,7 +1,9 @@
 // Secure Storage Service
-// Uses chrome.storage.local with simple obfuscation for API keys.
-// For production extensions, consider using chrome.storage.session (cleared on browser exit)
+// Uses browser.storage.local with simple obfuscation for API keys.
+// For production extensions, consider using browser.storage.session (cleared on browser exit)
 // or a native messaging host for hardware-backed encryption.
+
+import browser from './browser';
 
 const ENCRYPTION_KEY = 'termcheck-secure-v1-';
 
@@ -33,11 +35,11 @@ export const SecureStorage = {
     for (const [provider, key] of Object.entries(apiKeys)) {
       encrypted[provider] = obfuscate(key);
     }
-    await chrome.storage.local.set({ _secure_api_keys: encrypted });
+    await browser.storage.local.set({ _secure_api_keys: encrypted });
   },
 
   async getApiKeys(): Promise<Record<string, string>> {
-    const result = await chrome.storage.local.get('_secure_api_keys');
+    const result = await browser.storage.local.get('_secure_api_keys');
     const encrypted = result._secure_api_keys || {};
     const decrypted: Record<string, string> = {};
     for (const [provider, key] of Object.entries(encrypted)) {
@@ -48,19 +50,20 @@ export const SecureStorage = {
 
   async migrateLegacySettings(): Promise<void> {
     // Migrate old plaintext settings to secure storage
-    const result = await chrome.storage.local.get(['settings', '_migrated_v1']);
-    if (result._migrated_v1 && !result.settings?.apiKeys) return;
-    if (!result.settings?.apiKeys) {
-      await chrome.storage.local.set({ _migrated_v1: true });
+    const result = await browser.storage.local.get(['settings', '_migrated_v1']);
+    const settingsData = (result as any).settings;
+    if (result._migrated_v1 && !settingsData?.apiKeys) return;
+    if (!settingsData?.apiKeys) {
+      await browser.storage.local.set({ _migrated_v1: true });
       return;
     }
 
-    const keys = result.settings.apiKeys;
+    const keys = settingsData.apiKeys;
     await SecureStorage.saveApiKeys(keys);
 
     // Remove plaintext keys from settings
-    const newSettings = { ...result.settings };
+    const newSettings = { ...settingsData };
     delete newSettings.apiKeys;
-    await chrome.storage.local.set({ settings: newSettings, _migrated_v1: true });
+    await browser.storage.local.set({ settings: newSettings, _migrated_v1: true });
   },
 };

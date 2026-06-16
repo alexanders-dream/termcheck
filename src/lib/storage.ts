@@ -1,4 +1,5 @@
 import { LegalFlag } from './types';
+import browser from './browser';
 
 interface CachedResult {
     flags: LegalFlag[];
@@ -10,7 +11,7 @@ const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export const StorageService = {
     /**
-     * Save analysis result for a specific URL
+     * Save kháSave analysis result for a specific URL
      */
     async saveAnalysisResult(url: string, flags: LegalFlag[]): Promise<void> {
         const key = `${STORAGE_KEY_PREFIX}${url}`;
@@ -18,7 +19,7 @@ export const StorageService = {
             flags,
             timestamp: Date.now(),
         };
-        await chrome.storage.local.set({ [key]: data });
+        await browser.storage.local.set({ [key]: data });
     },
 
     /**
@@ -27,7 +28,7 @@ export const StorageService = {
      */
     async getAnalysisResult(url: string): Promise<LegalFlag[] | null> {
         const key = `${STORAGE_KEY_PREFIX}${url}`;
-        const result = await chrome.storage.local.get([key]);
+        const result = await browser.storage.local.get(key);
         const data = result[key] as CachedResult | undefined;
 
         if (!data) {
@@ -37,7 +38,7 @@ export const StorageService = {
         const now = Date.now();
         if (now - data.timestamp > TTL_MS) {
             // Expired, remove it
-            await chrome.storage.local.remove(key);
+            await browser.storage.local.remove(key);
             return null;
         }
 
@@ -49,7 +50,7 @@ export const StorageService = {
      * This can be called on app startup
      */
     async cleanupExpiredResults(): Promise<void> {
-        const allData = await chrome.storage.local.get(null);
+        const allData = await browser.storage.local.get(null);
         const keysToRemove: string[] = [];
         const now = Date.now();
 
@@ -63,7 +64,7 @@ export const StorageService = {
         }
 
         if (keysToRemove.length > 0) {
-            await chrome.storage.local.remove(keysToRemove);
+            await browser.storage.local.remove(keysToRemove);
         }
     }
 };
