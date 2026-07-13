@@ -6,12 +6,14 @@ A Chrome extension that analyzes Terms of Service and Privacy Policies for red f
 
 - **Multi-Provider Support**: Choose from OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, or Ollama (local).
 - **Dynamic Model Loading**: Automatically fetches available models from your selected provider's API with intelligent caching.
-- **Model Refresh**: Manually refresh the model list to get the latest available models from your provider.
 - **Smart Text Chunking**: Intelligently splits long documents into semantic chunks using a multi-stage fallback strategy (sentences → paragraphs → words → characters) for accurate analysis while preserving context.
 - **Comprehensive Risk Detection**: Identifies issues in categories including Data Sharing, Arbitration, Unilateral Changes, Liability, Jurisdiction, Termination, Intellectual Property, Privacy, Surveillance, and more.
 - **Severity Levels**: Flags are categorized as Low, Medium, High, or Critical risk with color-coded badges and icons.
 - **Privacy Focused**: API keys are stored locally in your browser using Chrome's storage API. Your data never leaves your device except for API calls to your chosen provider.
-- **Rescan Functionality**: Quickly re-analyze the current page without reloading.
+- **PDF Analysis**: Analyze browser-opened PDFs directly from your browser in addition to standard web pages.
+- **Background Processing**: Switch tabs while the AI analyzes long documents; your results are saved and waiting for you when you return.
+- **Export Reports**: Download your analysis results as PDF or Word documents for offline sharing and review.
+- **Dark Mode**: Integrated light and dark themes for comfortable reading.
 - **Local Model Support**: Run completely offline using Ollama with local models.
 
 ## Installation
@@ -44,15 +46,15 @@ A Chrome extension that analyzes Terms of Service and Privacy Policies for red f
    - Select your AI Provider.
    - Enter your API Key (not required for Ollama).
    - (Optional) Select a specific model from the dropdown (models are fetched dynamically from your provider).
-   - (Optional) Click the refresh icon to manually update the model list.
    - Click "Save Configuration".
 
 3. **Analyze Documents**:
-   - Navigate to a Terms of Service or Privacy Policy page.
+   - Navigate to a Terms of Service, Privacy Policy page, or a browser-opened PDF.
    - Click the TermCheck extension icon.
-   - Click "Analyze Page".
+   - Click "Analyze Page". You can safely switch tabs while the analysis runs in the background.
    - View the analysis results with flagged issues, sorted by severity.
-   - Click "Rescan Page" to re-analyze the current page with updated content or different settings.
+   - Use the "Export Word" or "Export PDF" buttons to save the report.
+   - Click "Rescan" to re-analyze the current page with updated content or different settings.
 
 ### Available Scripts
 
@@ -63,94 +65,14 @@ A Chrome extension that analyzes Terms of Service and Privacy Policies for red f
 
 ## How It Works
 
-1. **Content Extraction**: The extension extracts text content from the current page using the content script.
+1. **Content Extraction**: The extension extracts text content from the current page (or PDF) using the content script.
 2. **Smart Chunking**: Long documents are split into semantic chunks with overlap to preserve context.
 3. **AI Analysis**: Each chunk is analyzed by your selected AI model using a specialized legal analysis prompt.
 4. **Flag Merging**: Results from all chunks are merged and deduplicated.
-5. **Display**: Findings are displayed in the popup, sorted by severity with color-coded badges.
+5. **Caching & Display**: Findings are cached in your browser's local storage and displayed in the popup, sorted by severity with color-coded badges.
 
 ## Future Enhancements
 
-- **Export Options**: Allow users to export analysis reports (PDF, Markdown).
-- **Custom Prompts**: Let users customize AI analysis prompts.
-- **History**: Save past analyses for quick reference.
-- **Better Content Extraction**: Improve main content detection for complex pages.
-- **Comparison Mode**: Compare multiple versions of ToS to detect changes.
-
-# TermCheck - AI Legal Assistant
-
-A Chrome extension that analyzes Terms of Service and Privacy Policies for red flags using AI.
-
-## Features
-
-- **Multi-Provider Support**: Choose from OpenAI, Anthropic, Groq, Google Gemini, OpenRouter, or Ollama (local).
-- **Dynamic Model Loading**: Automatically fetches available models from your selected provider's API with intelligent caching.
-- **Model Refresh**: Manually refresh the model list to get the latest available models from your provider.
-- **Smart Text Chunking**: Intelligently splits long documents into semantic chunks using a multi-stage fallback strategy (sentences → paragraphs → words → characters) for accurate analysis while preserving context.
-- **Comprehensive Risk Detection**: Identifies issues in categories including Data Sharing, Arbitration, Unilateral Changes, Liability, Jurisdiction, Termination, Intellectual Property, Privacy, Surveillance, and more.
-- **Severity Levels**: Flags are categorized as Low, Medium, High, or Critical risk with color-coded badges and icons.
-- **Privacy Focused**: API keys are stored locally in your browser using Chrome's storage API. Your data never leaves your device except for API calls to your chosen provider.
-- **Rescan Functionality**: Quickly re-analyze the current page without reloading.
-- **Local Model Support**: Run completely offline using Ollama with local models.
-
-## Installation
-
-1. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-2. **Build the extension**:
-   ```bash
-   npm run build
-   ```
-
-3. **Load in Chrome**:
-   - Open Chrome and navigate to `chrome://extensions`
-   - Enable "Developer Mode" (toggle in top right)
-   - Click "Load unpacked"
-   - Select the `dist` folder generated by the build command
-
-## Usage
-
-1. **Get an API Key**:
-   - Obtain an API key from your preferred provider (e.g., [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), [Groq](https://console.groq.com/), [Google AI Studio](https://makersuite.google.com/app/apikey)).
-   - Skip this step if using Ollama locally.
-
-2. **Configure the Extension**:
-   - Click the TermCheck extension icon.
-   - Click the gear icon to open settings.
-   - Select your AI Provider.
-   - Enter your API Key (not required for Ollama).
-   - (Optional) Select a specific model from the dropdown (models are fetched dynamically from your provider).
-   - (Optional) Click the refresh icon to manually update the model list.
-   - Click "Save Configuration".
-
-3. **Analyze Documents**:
-   - Navigate to a Terms of Service or Privacy Policy page.
-   - Click the TermCheck extension icon.
-   - Click "Analyze Page".
-   - View the analysis results with flagged issues, sorted by severity.
-   - Click "Rescan Page" to re-analyze the current page with updated content or different settings.
-
-### Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run lint` - Run ESLint
-- `npm run preview` - Preview production build
-
-## How It Works
-
-1. **Content Extraction**: The extension extracts text content from the current page using the content script.
-2. **Smart Chunking**: Long documents are split into semantic chunks with overlap to preserve context.
-3. **AI Analysis**: Each chunk is analyzed by your selected AI model using a specialized legal analysis prompt.
-4. **Flag Merging**: Results from all chunks are merged and deduplicated.
-5. **Display**: Findings are displayed in the popup, sorted by severity with color-coded badges.
-
-## Future Enhancements
-
-- **Export Options**: Allow users to export analysis reports (PDF, Markdown).
 - **Custom Prompts**: Let users customize AI analysis prompts.
 - **History**: Save past analyses for quick reference.
 - **Better Content Extraction**: Improve main content detection for complex pages.
