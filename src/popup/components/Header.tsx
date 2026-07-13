@@ -20,15 +20,8 @@ export const Header = ({ providerName, modelName, onSettingsClick }: HeaderProps
             className="flex items-center justify-between px-5 py-4 bg-paper-surface/80 backdrop-blur-md border-b border-edge/50 sticky top-0 z-20"
         >
             <div className="flex items-center gap-3.5">
-                <div className="w-9 h-9 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand">
-                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <path d="M8 13h.01" />
-                        <path d="M8 17h.01" />
-                        <path d="M12 13h.01" />
-                        <path d="M12 17h.01" />
-                    </svg>
+                <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
+                    <img src="/termcheck_icon32.png" alt="TermCheck" className="w-full h-full object-contain" />
                 </div>
                 <div className="min-w-0">
                     <h1 className="text-base font-bold text-ink-primary leading-tight tracking-tight">TermCheck</h1>

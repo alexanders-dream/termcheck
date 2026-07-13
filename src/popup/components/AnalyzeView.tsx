@@ -16,8 +16,8 @@ export const AnalyzeView = ({ loading, onAnalyze }: AnalyzeViewProps) => {
         <div className="relative w-24 h-24">
           <div className="absolute inset-0 bg-brand/20 rounded-full animate-ping" style={{ animationDuration: '3s' }} />
           <div className="absolute inset-0 bg-brand/10 rounded-full animate-ping" style={{ animationDuration: '3s', animationDelay: '0.5s' }} />
-          <div className="relative w-full h-full bg-paper-surface border border-edge rounded-full flex items-center justify-center shadow-card">
-            <Shield className="h-10 w-10 text-brand animate-pulse" />
+          <div className="relative w-full h-full bg-paper-surface border border-edge rounded-full flex items-center justify-center shadow-card overflow-hidden">
+            <img src="/termcheck_icon48.png" alt="TermCheck" className="h-12 w-12 object-contain animate-pulse" />
           </div>
         </div>
         <div className="space-y-2">
@@ -45,8 +45,8 @@ export const AnalyzeView = ({ loading, onAnalyze }: AnalyzeViewProps) => {
         transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
       >
         <div className="absolute inset-0 bg-brand/10 rounded-full blur-2xl" />
-        <div className="relative w-full h-full bg-paper-elevated border border-edge rounded-full flex items-center justify-center shadow-card">
-          <FileText className="h-10 w-10 text-brand" />
+        <div className="relative w-full h-full bg-paper-elevated border border-edge rounded-full flex items-center justify-center shadow-card overflow-hidden">
+          <img src="/termcheck_icon48.png" alt="TermCheck" className="h-12 w-12 object-contain" />
         </div>
       </motion.div>
 
