@@ -3,6 +3,7 @@ import { SYSTEM_PROMPT } from '../lib/prompts';
 import { AppSettings, LegalFlag } from '../lib/types';
 import { getProviderConfig } from '../lib/ai/providers';
 import { SecureStorage } from '../lib/secureStorage';
+import { StorageService } from '../lib/storage';
 import browser from '../lib/browser';
 
 // Context menu for quick analysis
@@ -55,6 +56,14 @@ async function handleAnalysis(
   text: string,
   senderInfo: Record<string, any>
 ): Promise<any> {
+  if (senderInfo.url) {
+    const data = await browser.storage.local.get('analyzingUrls');
+    const urls = data.analyzingUrls || [];
+    if (!urls.includes(senderInfo.url)) {
+      await browser.storage.local.set({ analyzingUrls: [...urls, senderInfo.url] });
+    }
+  }
+
   try {
     const storage = await browser.storage.local.get(['settings']);
     const settings: AppSettings = (storage as any).settings;
@@ -94,11 +103,20 @@ async function handleAnalysis(
     };
 
     await browser.storage.local.set({ lastAnalysis: analysisResult });
+    if (senderInfo.url) {
+      await StorageService.saveAnalysisResult(senderInfo.url, flags);
+    }
 
     return { success: true, data: flags, metadata: analysisResult.metadata };
   } catch (error) {
     console.error(`[TermCheck] Analysis failed:`, error);
     return { success: false, error: (error as Error).message };
+  } finally {
+    if (senderInfo.url) {
+      const data = await browser.storage.local.get('analyzingUrls');
+      const urls = data.analyzingUrls || [];
+      await browser.storage.local.set({ analyzingUrls: urls.filter((u: string) => u !== senderInfo.url) });
+    }
   }
 }
 

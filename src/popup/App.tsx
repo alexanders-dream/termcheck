@@ -67,13 +67,40 @@ function TermCheckApp() {
       const tab = tabs[0];
       if (tab?.url) {
         const cachedFlags = await StorageService.getAnalysisResult(tab.url);
-        if (cachedFlags) { setFlags(cachedFlags); }
+        if (cachedFlags) { 
+          setFlags(cachedFlags); 
+        } else {
+          const data = await browser.storage.local.get('analyzingUrls');
+          const analyzingUrls = data.analyzingUrls || [];
+          if (analyzingUrls.includes(tab.url)) {
+            setLoading(true);
+          }
+        }
         setCurrentPageUrl(tab.url);
         setCurrentPageTitle(tab.title || '');
       }
     };
     checkCache();
   }, []);
+
+  useEffect(() => {
+    const handleStorageChange = async (changes: any, areaName: string) => {
+      if (areaName === 'local' && currentPageUrl) {
+        const key = `analysis_cache_${currentPageUrl}`;
+        if (changes[key] && changes[key].newValue) {
+           setFlags(changes[key].newValue.flags);
+           setLoading(false);
+        } else if (changes.analyzingUrls) {
+           const newUrls = changes.analyzingUrls.newValue || [];
+           if (!newUrls.includes(currentPageUrl) && loading) {
+             setLoading(false);
+           }
+        }
+      }
+    };
+    browser.storage.onChanged.addListener(handleStorageChange);
+    return () => browser.storage.onChanged.removeListener(handleStorageChange);
+  }, [currentPageUrl, loading]);
 
   const loadModelsForProvider = async (provider: AIProvider, apiKey: string, forceRefresh = false) => {
     setModelsLoading(true);
